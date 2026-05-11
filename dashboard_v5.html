@@ -63,7 +63,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
 .cblock{background:var(--bg2);border:1px solid var(--bd);border-radius:4px;display:flex;flex-direction:column;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.05);}
 .cblock.main-chart{height:280px;}
 .cblock.sub-chart{height:220px;}
-.cblock.ind-block{height:80px;}
+
 
 /* 차트 헤더 */
 .ch{background:var(--bg3);padding:3px 8px;display:flex;align-items:center;gap:6px;height:24px;flex-shrink:0;border-bottom:1px solid var(--bd);border-radius:4px 4px 0 0;}
@@ -245,20 +245,31 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
   </div>
 
   <!-- 3분 RSI -->
-  <div class="cblock ind-block">
-    <div class="ch" style="height:20px;">
-      <span style="font-size:9px;font-weight:700;color:var(--pu)">RSI(14)</span>
-      <span id="rsi3m-v" style="font-size:10px;font-weight:700;margin-left:6px;color:var(--pu)">--</span>
-      <span style="font-size:9px;font-weight:700;color:#c8860a;margin-left:10px;">MACD</span>
-      <span id="macd3m-v" style="font-size:9px;font-weight:700;margin-left:4px;">--</span>
-      <span style="font-size:9px;font-weight:700;color:#5c7a29;margin-left:10px;">STOCH</span>
-      <span id="stoch3m-v" style="font-size:9px;font-weight:700;margin-left:4px;">--</span>
+  <!-- 3분 RSI -->
+  <div class="cblock" style="height:65px;">
+    <div class="ch" style="height:18px;padding:2px 8px;">
+      <span style="font-size:9px;font-weight:700;color:#7048e8">RSI(14)</span>
+      <span id="rsi3m-v" style="font-size:10px;font-weight:700;margin-left:6px;color:#7048e8">--</span>
+      <span style="font-size:8px;color:var(--tx2);margin-left:auto">과매도:30 과매수:70</span>
     </div>
-    <div class="cb" style="display:flex;gap:1px;">
-      <div style="flex:1;position:relative;"><div class="chart-main" id="c3m-rsi"></div></div>
-      <div style="flex:1;position:relative;"><div class="chart-main" id="c3m-macd"></div></div>
-      <div style="flex:1;position:relative;"><div class="chart-main" id="c3m-stoch"></div></div>
+    <div class="cb"><div class="chart-main" id="c3m-rsi"></div></div>
+  </div>
+  <!-- 3분 MACD -->
+  <div class="cblock" style="height:65px;">
+    <div class="ch" style="height:18px;padding:2px 8px;">
+      <span style="font-size:9px;font-weight:700;color:#c8860a">MACD(12,26,9)</span>
+      <span id="macd3m-v" style="font-size:9px;font-weight:700;margin-left:6px;">--</span>
     </div>
+    <div class="cb"><div class="chart-main" id="c3m-macd"></div></div>
+  </div>
+  <!-- 3분 STOCH -->
+  <div class="cblock" style="height:65px;">
+    <div class="ch" style="height:18px;padding:2px 8px;">
+      <span style="font-size:9px;font-weight:700;color:#5c7a29">STOCH(14,3)</span>
+      <span id="stoch3m-v" style="font-size:9px;font-weight:700;margin-left:6px;">--</span>
+      <span style="font-size:8px;color:var(--tx2);margin-left:auto">과매도:20 과매수:80</span>
+    </div>
+    <div class="cb"><div class="chart-main" id="c3m-stoch"></div></div>
   </div>
 
   <!-- 15분봉 -->
@@ -276,20 +287,31 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
   </div>
 
   <!-- 15분 지표 -->
-  <div class="cblock ind-block">
-    <div class="ch" style="height:20px;">
-      <span style="font-size:9px;font-weight:700;color:var(--pu)">RSI(14)</span>
-      <span id="rsi15m-v" style="font-size:10px;font-weight:700;margin-left:6px;color:var(--pu)">--</span>
-      <span style="font-size:9px;font-weight:700;color:#c8860a;margin-left:10px;">MACD</span>
-      <span id="macd15m-v" style="font-size:9px;font-weight:700;margin-left:4px;">--</span>
-      <span style="font-size:9px;font-weight:700;color:#5c7a29;margin-left:10px;">STOCH</span>
-      <span id="stoch15m-v" style="font-size:9px;font-weight:700;margin-left:4px;">--</span>
+  <!-- 15분 RSI -->
+  <div class="cblock" style="height:65px;">
+    <div class="ch" style="height:18px;padding:2px 8px;">
+      <span style="font-size:9px;font-weight:700;color:#7048e8">RSI(14)</span>
+      <span id="rsi15m-v" style="font-size:10px;font-weight:700;margin-left:6px;color:#7048e8">--</span>
+      <span style="font-size:8px;color:var(--tx2);margin-left:auto">과매도:30 과매수:70</span>
     </div>
-    <div class="cb" style="display:flex;gap:1px;">
-      <div style="flex:1;position:relative;"><div class="chart-main" id="c15m-rsi"></div></div>
-      <div style="flex:1;position:relative;"><div class="chart-main" id="c15m-macd"></div></div>
-      <div style="flex:1;position:relative;"><div class="chart-main" id="c15m-stoch"></div></div>
+    <div class="cb"><div class="chart-main" id="c15m-rsi"></div></div>
+  </div>
+  <!-- 15분 MACD -->
+  <div class="cblock" style="height:65px;">
+    <div class="ch" style="height:18px;padding:2px 8px;">
+      <span style="font-size:9px;font-weight:700;color:#c8860a">MACD(12,26,9)</span>
+      <span id="macd15m-v" style="font-size:9px;font-weight:700;margin-left:6px;">--</span>
     </div>
+    <div class="cb"><div class="chart-main" id="c15m-macd"></div></div>
+  </div>
+  <!-- 15분 STOCH -->
+  <div class="cblock" style="height:65px;">
+    <div class="ch" style="height:18px;padding:2px 8px;">
+      <span style="font-size:9px;font-weight:700;color:#5c7a29">STOCH(14,3)</span>
+      <span id="stoch15m-v" style="font-size:9px;font-weight:700;margin-left:6px;">--</span>
+      <span style="font-size:8px;color:var(--tx2);margin-left:auto">과매도:20 과매수:80</span>
+    </div>
+    <div class="cb"><div class="chart-main" id="c15m-stoch"></div></div>
   </div>
 
   <!-- 1시간봉 -->
