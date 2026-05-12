@@ -97,25 +97,66 @@ body{display:flex;flex-direction:column;min-height:100vh;}
 .alert-row .as.short{color:var(--rd);}
 
 /* === 데스크탑 레이아웃 === */
-@media (min-width:900px){
-  #main-wrapper{display:grid;grid-template-columns:1fr 320px;gap:8px;padding:8px;}
-  #left-col{display:flex;flex-direction:column;gap:8px;}
-  #right-col{display:flex;flex-direction:column;gap:8px;}
-  #main-chart{height:50vh;}
-  #signal-banner{border-radius:6px;border:1px solid var(--bd);}
-  #conds{border-radius:6px;}
-  #scanner{border-radius:6px;}
-  #alerts{border-radius:6px;max-height:200px;}
-  #chart-wrap{border-radius:6px;overflow:hidden;border:1px solid var(--bd);}
-}
+#main-wrapper{display:grid;grid-template-columns:1fr 320px;gap:6px;padding:6px;}
+#chart-area{display:grid;grid-template-columns:1fr 280px;gap:6px;grid-column:1;}
+#left-side{display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;overflow:hidden;}
+#tv-chart{height:55vh;min-height:340px;}
+#indicators-row{display:flex;flex-direction:column;}
+#right-side{display:flex;flex-direction:column;gap:6px;}
+.mini-block{background:var(--bg2);border:1px solid var(--bd);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;}
+.mini-label{font-size:11px;font-weight:700;color:var(--gd);padding:5px 8px;background:var(--bg3);border-bottom:1px solid var(--bd);}
+.mini-chart{height:180px;position:relative;}
+.mini-rsi{height:60px;border-top:1px solid var(--bd);position:relative;}
+
+/* 트리플 크로스 배너: chart-area 위에 sticky로 표시 (자리 안 차지) */
+#triple-banner{grid-column:1 / -1;padding:10px;border-radius:6px;text-align:center;font-size:16px;font-weight:900;letter-spacing:1px;display:none;}
+#triple-banner.long,#triple-banner.short{display:block;}
+#triple-banner.long{background:linear-gradient(90deg,rgba(15,214,111,0.25),rgba(15,214,111,0.1));border:2px solid var(--gn);color:var(--gn);box-shadow:0 0 20px rgba(15,214,111,0.3);}
+#triple-banner.short{background:linear-gradient(90deg,rgba(255,75,110,0.25),rgba(255,75,110,0.1));border:2px solid var(--rd);color:var(--rd);box-shadow:0 0 20px rgba(255,75,110,0.3);}
+
+/* 우측 사이드 정보패널 */
+#info-side{grid-column:2;display:flex;flex-direction:column;gap:6px;}
+#conds,#scanner-wrap,#alerts{background:var(--bg2);border:1px solid var(--bd);border-radius:6px;}
+#scanner{display:flex;flex-direction:column;gap:4px;padding:4px;}
+.coin-card{display:flex;justify-content:space-between;align-items:center;min-width:0;padding:6px 10px;text-align:left;}
+.coin-card .cn{font-size:13px;}
+.coin-card .cs{font-size:12px;margin-top:0;}
+.coin-card .cp{font-size:11px;margin-top:0;color:var(--tx2);}
+
+/* 폰트 키움 */
+.cond-title,.alert-title{font-size:12px;}
+.cond-item{font-size:12px;padding:6px 8px;}
+.cv{font-size:12px;}
+.ind-label{font-size:11px;}
+.ind-val{font-size:11px;}
+.alert-row{font-size:11px;padding:4px 0;}
+.alert-row .at{font-size:10px;}
 
 /* === 모바일 === */
 @media (max-width:899px){
   #signal-banner{position:sticky;top:48px;z-index:90;}
-  #main-chart{height:50vh;}
-  .ind-chart{height:55px;}
+  #main-wrapper{grid-template-columns:1fr;padding:4px;gap:4px;}
+  #chart-area{grid-template-columns:1.6fr 1fr;gap:4px;grid-column:1;}
+  #info-side{grid-column:1;flex-direction:row;flex-wrap:wrap;}
+  #info-side > div{flex:1;min-width:46%;}
+  #tv-chart{height:42vh;min-height:240px;}
+  .mini-chart{height:100px;}
+  .mini-rsi{height:46px;}
+  .mini-label{font-size:10px;padding:3px 6px;}
+  .ind-chart{height:52px;}
+  .ind-label{font-size:10px;}
+  .ind-val{font-size:10px;}
   .sig-arrow{font-size:26px;}
   .sig-score{font-size:26px;}
+  #triple-banner{font-size:14px;padding:8px;}
+}
+
+@media (max-width:600px){
+  #chart-area{grid-template-columns:1fr;}
+  #tv-chart{height:38vh;min-height:220px;}
+  #right-side{flex-direction:row;}
+  .mini-block{flex:1;}
+  .mini-chart{height:120px;}
 }
 
 button{font-family:inherit;}
@@ -177,40 +218,66 @@ button{font-family:inherit;}
 </div>
 
 <div id="main-wrapper">
-<div id="left-col">
 
-<!-- 차트 -->
-<div id="chart-wrap">
-  <div id="tv-chart" style="height:55vh;min-height:320px;background:#0a0e14;"></div>
-  <div class="ind-chart" id="ind-rsi">
-    <div class="ind-label">RSI(14)</div>
-    <div class="ind-val" id="v-rsi">--</div>
+<!-- 차트 영역 -->
+<div id="chart-area">
+  <!-- 왼쪽: 메인 TV + 보조지표 6개 -->
+  <div id="left-side">
+    <div id="tv-chart" style="background:#0a0e14;"></div>
+    <div id="indicators-row">
+      <div class="ind-chart" id="ind-rsi">
+        <div class="ind-label">RSI(14)</div>
+        <div class="ind-val" id="v-rsi">--</div>
+      </div>
+      <div class="ind-chart" id="ind-macd">
+        <div class="ind-label">MACD(12,26,9)</div>
+        <div class="ind-val" id="v-macd">--</div>
+      </div>
+      <div class="ind-chart" id="ind-adx">
+        <div class="ind-label">ADX(14) · +DI · -DI</div>
+        <div class="ind-val" id="v-adx">--</div>
+      </div>
+      <div class="ind-chart" id="ind-st1">
+        <div class="ind-label">Stoch(5,3,3) ★빠름</div>
+        <div class="ind-val" id="v-st1">--</div>
+      </div>
+      <div class="ind-chart" id="ind-st2">
+        <div class="ind-label">Stoch(14,3,3) 중간</div>
+        <div class="ind-val" id="v-st2">--</div>
+      </div>
+      <div class="ind-chart" id="ind-st3">
+        <div class="ind-label">Stoch(21,7,7) 느림</div>
+        <div class="ind-val" id="v-st3">--</div>
+      </div>
+    </div>
   </div>
-  <div class="ind-chart" id="ind-macd">
-    <div class="ind-label">MACD(12,26,9)</div>
-    <div class="ind-val" id="v-macd">--</div>
-  </div>
-  <div class="ind-chart" id="ind-adx">
-    <div class="ind-label">ADX(14) · +DI · -DI</div>
-    <div class="ind-val" id="v-adx">--</div>
-  </div>
-  <div class="ind-chart" id="ind-st1">
-    <div class="ind-label">Stoch(5,3,3) ★빠름</div>
-    <div class="ind-val" id="v-st1">--</div>
-  </div>
-  <div class="ind-chart" id="ind-st2">
-    <div class="ind-label">Stoch(14,3,3) 중간</div>
-    <div class="ind-val" id="v-st2">--</div>
-  </div>
-  <div class="ind-chart" id="ind-st3">
-    <div class="ind-label">Stoch(21,7,7) 느림</div>
-    <div class="ind-val" id="v-st3">--</div>
+
+  <!-- 오른쪽: 미니 1H + RSI + 미니 15M + RSI -->
+  <div id="right-side">
+    <div class="mini-block">
+      <div class="mini-label">1시간봉</div>
+      <div class="mini-chart" id="mini-1h"></div>
+      <div class="mini-rsi" id="mini-1h-rsi">
+        <div class="ind-label">RSI(14)</div>
+        <div class="ind-val" id="v-mini-1h-rsi">--</div>
+      </div>
+    </div>
+    <div class="mini-block">
+      <div class="mini-label">15분봉</div>
+      <div class="mini-chart" id="mini-15m"></div>
+      <div class="mini-rsi" id="mini-15m-rsi">
+        <div class="ind-label">RSI(14)</div>
+        <div class="ind-val" id="v-mini-15m-rsi">--</div>
+      </div>
+    </div>
   </div>
 </div>
 
-</div>
+<!-- 트리플 크로스 표시 -->
+<div id="triple-banner" style="display:none;"></div>
 
-<div id="right-col">
+<!-- 정보 사이드바 -->
+<div id="info-side">
 
 <!-- 조건 체크 -->
 <div id="conds">
@@ -584,6 +651,64 @@ function initCharts(){
     const c=setupInd('ind-'+k,k);
     S.series[k+'K']=c.addLineSeries({color:'#5b9eff',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});
     S.series[k+'D']=c.addLineSeries({color:'#ffa726',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+    // 기준선 (20, 80)
+    const refHi=c.addLineSeries({color:'rgba(255,75,110,0.25)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dashed});
+    const refLo=c.addLineSeries({color:'rgba(15,214,111,0.25)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dashed});
+    S.series[k+'_refHi']=refHi;
+    S.series[k+'_refLo']=refLo;
+  });
+
+  // 미니 차트 (1H, 15M)
+  ['mini-1h','mini-15m'].forEach(id=>{
+    const el=document.getElementById(id);
+    const c=LightweightCharts.createChart(el,{...DARK_OPT,width:el.offsetWidth,height:el.offsetHeight,timeScale:{...DARK_OPT.timeScale,visible:false}});
+    const cs=c.addCandlestickSeries({upColor:'#0fd66f',downColor:'#ff4b6e',borderUpColor:'#0fd66f',borderDownColor:'#ff4b6e',wickUpColor:'#0fd66f',wickDownColor:'#ff4b6e'});
+    S.charts[id]=c;S.series[id+'_candle']=cs;
+    new ResizeObserver(es=>{for(const e of es)c.resize(e.contentRect.width,e.contentRect.height);}).observe(el);
+  });
+
+  // 미니 RSI 차트
+  ['mini-1h-rsi','mini-15m-rsi'].forEach(id=>{
+    const el=document.getElementById(id);
+    const c=LightweightCharts.createChart(el,{...IND_OPT,width:el.offsetWidth,height:el.offsetHeight});
+    const ln=c.addLineSeries({color:'#a371f7',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});
+    const refHi=c.addLineSeries({color:'rgba(255,75,110,0.25)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dashed});
+    const refLo=c.addLineSeries({color:'rgba(15,214,111,0.25)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,lineStyle:LightweightCharts.LineStyle.Dashed});
+    S.charts[id]=c;S.series[id]=ln;S.series[id+'_refHi']=refHi;S.series[id+'_refLo']=refLo;
+    new ResizeObserver(es=>{for(const e of es)c.resize(e.contentRect.width,e.contentRect.height);}).observe(el);
+  });
+
+  // ── 보조지표 6개 시간축 동기화 ──
+  const indKeys=['rsi','macd','adx','st1','st2','st3'];
+  let syncing=false;
+  indKeys.forEach(srcKey=>{
+    const srcChart=S.charts[srcKey];
+    if(!srcChart)return;
+    srcChart.timeScale().subscribeVisibleLogicalRangeChange(range=>{
+      if(syncing||!range)return;
+      syncing=true;
+      indKeys.forEach(dstKey=>{
+        if(dstKey===srcKey)return;
+        const dst=S.charts[dstKey];
+        if(dst)try{dst.timeScale().setVisibleLogicalRange(range);}catch(e){}
+      });
+      syncing=false;
+    });
+    // 십자선 동기화
+    srcChart.subscribeCrosshairMove(param=>{
+      if(syncing)return;
+      syncing=true;
+      indKeys.forEach(dstKey=>{
+        if(dstKey===srcKey)return;
+        const dst=S.charts[dstKey];
+        if(dst&&param.time){
+          try{dst.setCrosshairPosition(NaN,param.time,S.series[dstKey]||S.series[dstKey+'K']);}catch(e){}
+        } else if(dst){
+          try{dst.clearCrosshairPosition();}catch(e){}
+        }
+      });
+      syncing=false;
+    });
   });
 }
 
@@ -667,6 +792,36 @@ async function refreshAll(){
   S.candles[S.coin+'_'+S.tf]=candles;
   drawMain(candles);
   computeAndRender(candles);
+  // 미니 차트 (1h, 15m)
+  loadMiniChart('mini-1h','1h',200);
+  loadMiniChart('mini-15m','15m',200);
+}
+
+async function loadMiniChart(id,tf,limit){
+  try{
+    const candles=await loadKlines(S.coin,tf,limit);
+    if(!candles.length)return;
+    const cs=S.series[id+'_candle'];
+    if(cs)cs.setData(candles);
+    // RSI
+    const rsiKey=id+'-rsi';
+    const closes=candles.map(c=>c.close);
+    const rsiArr=rsi(closes,14);
+    if(rsiArr&&S.series[rsiKey]){
+      const off=candles.length-rsiArr.length;
+      const data=rsiArr.map((v,i)=>({time:candles[i+off].time,value:v}));
+      S.series[rsiKey].setData(data);
+      // 기준선
+      if(data.length){
+        const t0=data[0].time,tN=data[data.length-1].time;
+        S.series[rsiKey+'_refHi'].setData([{time:t0,value:70},{time:tN,value:70}]);
+        S.series[rsiKey+'_refLo'].setData([{time:t0,value:30},{time:tN,value:30}]);
+      }
+      const last=rsiArr[rsiArr.length-1];
+      const vEl=document.getElementById('v-'+rsiKey);
+      if(vEl)vEl.textContent=last.toFixed(1);
+    }
+  }catch(e){logErr('mini '+id,e);}
 }
 
 // ═══════════════════════════════════════════════
@@ -702,13 +857,68 @@ function drawIndicators(sig,candles){
     S.series.plusDI.setData(a.plusDISeries.map((v,i)=>({time:times[i+offD],value:v})));
     S.series.minusDI.setData(a.minusDISeries.map((v,i)=>({time:times[i+offD],value:v})));
   }
-  // Stoch x3
+  // Stoch x3 + 트리플 크로스 감지
+  const stochInfo={};
   [['st1',sig.indicators.st1],['st2',sig.indicators.st2],['st3',sig.indicators.st3]].forEach(([k,s])=>{
     if(!s)return;
     const offK=candles.length-s.k.length;
     S.series[k+'K'].setData(s.k.map((v,i)=>({time:times[i+offK],value:v})));
     const offD=candles.length-s.d.length;
     S.series[k+'D'].setData(s.d.map((v,i)=>({time:times[i+offD],value:v})));
+    // 기준선
+    if(times.length){
+      S.series[k+'_refHi'].setData([{time:times[0],value:80},{time:times[times.length-1],value:80}]);
+      S.series[k+'_refLo'].setData([{time:times[0],value:20},{time:times[times.length-1],value:20}]);
+    }
+    // K-D 크로스 시퀀스 (최근 5봉 내 크로스)
+    const crosses=[];
+    for(let i=Math.max(1,s.k.length-5);i<s.k.length;i++){
+      const cur=s.k[i]-s.d[i],prev=s.k[i-1]-s.d[i-1];
+      if(cur>0&&prev<=0)crosses.push({type:'golden',idx:i,time:times[i+offK]});
+      else if(cur<0&&prev>=0)crosses.push({type:'dead',idx:i,time:times[i+offK]});
+    }
+    stochInfo[k]=crosses;
+  });
+
+  // 트리플 크로스 감지: 3개 스토 모두 최근 3봉 내 같은 방향 크로스
+  detectTripleCross(stochInfo,candles);
+}
+
+function detectTripleCross(stochInfo,candles){
+  if(!stochInfo.st1||!stochInfo.st2||!stochInfo.st3)return;
+  const banner=document.getElementById('triple-banner');
+  if(!banner)return;
+  const recentBars=candles.slice(-3).map(c=>c.time);
+  const recentSet=new Set(recentBars);
+
+  const isCrossNearby=(crosses,type)=>crosses.some(c=>c.type===type&&recentSet.has(c.time));
+  const allGolden=isCrossNearby(stochInfo.st1,'golden')&&isCrossNearby(stochInfo.st2,'golden')&&isCrossNearby(stochInfo.st3,'golden');
+  const allDead=isCrossNearby(stochInfo.st1,'dead')&&isCrossNearby(stochInfo.st2,'dead')&&isCrossNearby(stochInfo.st3,'dead');
+
+  if(allGolden){
+    banner.style.display='block';
+    banner.className='long';
+    banner.textContent='🚀 TRIPLE GOLDEN CROSS — 강한 롱 시그널';
+    applyStochBackground('golden');
+  } else if(allDead){
+    banner.style.display='block';
+    banner.className='short';
+    banner.textContent='💥 TRIPLE DEAD CROSS — 강한 숏 시그널';
+    applyStochBackground('dead');
+  } else {
+    banner.style.display='none';
+    applyStochBackground(null);
+  }
+}
+
+function applyStochBackground(type){
+  ['st1','st2','st3'].forEach(k=>{
+    const c=S.charts[k];
+    if(!c)return;
+    let bg='#0a0e14';
+    if(type==='golden')bg='#0e2419';
+    else if(type==='dead')bg='#2a0e15';
+    try{c.applyOptions({layout:{background:{type:'Solid',color:bg}}});}catch(e){}
   });
 }
 
