@@ -1000,18 +1000,16 @@ function calcScore(ind,fib,vp,price,overallDir,vwap){
   ok('vp','VOL POC 근접',2,vp&&f786&&Math.abs(vp.poc.price-f786)/f786<0.03);
 
   // ── VWAP 스캘핑 시그널 ──
-  if(vwap?.last){
+  if(vwap&&vwap.last&&isFinite(vwap.last.vwap)){
     const vw=vwap.last;
-    const slopeUp=vwap.slope>0.05;
-    const slopeDn=vwap.slope<-0.05;
-    // VWAP 위/아래 안정 + 추세 일치
+    const slopeUp=(vwap.slope||0)>0.05;
+    const slopeDn=(vwap.slope||0)<-0.05;
     const aboveVwap=price>vw.vwap;
     const belowVwap=price<vw.vwap;
     ok('vwap_side',aboveVwap?'VWAP 상단 (매수우위)':belowVwap?'VWAP 하단 (매도우위)':'VWAP 부근',2,
       isLong?(aboveVwap&&slopeUp):isShort?(belowVwap&&slopeDn):false);
-    // -1σ/+1σ 평균회귀
-    const at_l1=Math.abs(price-vw.lower1)/price<0.002;
-    const at_u1=Math.abs(price-vw.upper1)/price<0.002;
+    const at_l1=isFinite(vw.lower1)&&Math.abs(price-vw.lower1)/price<0.002;
+    const at_u1=isFinite(vw.upper1)&&Math.abs(price-vw.upper1)/price<0.002;
     ok('vwap_band',isLong?'VWAP -1σ 평균회귀':isShort?'VWAP +1σ 평균회귀':'VWAP ±1σ',3,
       isLong?at_l1:isShort?at_u1:false);
   } else {
@@ -1064,23 +1062,28 @@ function drawEMALines(chartId,data,ema60_1d,ema200_1d){
 
 // ── VWAP + ±σ 밴드 그리기 (스캘핑용: 3분/15분만) ──
 function drawVWAPLines(chartId,vwapData){
-  const chart=S.charts[chartId];if(!chart||!vwapData?.series?.length)return;
-  // 기존 시리즈 제거
-  if(S.vwapLines[chartId])S.vwapLines[chartId].forEach(s=>{try{chart.removeSeries(s);}catch(e){}});
-  S.vwapLines[chartId]=[];
+  try{
+    const chart=S.charts[chartId];
+    if(!chart||!vwapData||!vwapData.series||!vwapData.series.length)return;
+    // 기존 시리즈 제거
+    if(S.vwapLines[chartId])S.vwapLines[chartId].forEach(s=>{try{chart.removeSeries(s);}catch(e){}});
+    S.vwapLines[chartId]=[];
 
-  const mainLine=chart.addLineSeries({color:'rgba(26,95,180,0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'VWAP'});
-  const u1=chart.addLineSeries({color:'rgba(26,95,180,0.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
-  const l1=chart.addLineSeries({color:'rgba(26,95,180,0.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
-  const u2=chart.addLineSeries({color:'rgba(192,57,43,0.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dotted});
-  const l2=chart.addLineSeries({color:'rgba(10,122,106,0.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dotted});
+    const mainLine=chart.addLineSeries({color:'rgba(26,95,180,0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'VWAP'});
+    const u1=chart.addLineSeries({color:'rgba(26,95,180,0.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
+    const l1=chart.addLineSeries({color:'rgba(26,95,180,0.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
+    const u2=chart.addLineSeries({color:'rgba(192,57,43,0.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dotted});
+    const l2=chart.addLineSeries({color:'rgba(10,122,106,0.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dotted});
 
-  mainLine.setData(vwapData.series.map(d=>({time:d.time,value:d.vwap})));
-  u1.setData(vwapData.series.map(d=>({time:d.time,value:d.upper1})));
-  l1.setData(vwapData.series.map(d=>({time:d.time,value:d.lower1})));
-  u2.setData(vwapData.series.map(d=>({time:d.time,value:d.upper2})));
-  l2.setData(vwapData.series.map(d=>({time:d.time,value:d.lower2})));
-  S.vwapLines[chartId]=[mainLine,u1,l1,u2,l2];
+    // 유효한 데이터만 필터링 (NaN, undefined 방어)
+    const safe=arr=>arr.filter(d=>d&&isFinite(d.value));
+    mainLine.setData(safe(vwapData.series.map(d=>({time:d.time,value:d.vwap}))));
+    u1.setData(safe(vwapData.series.map(d=>({time:d.time,value:d.upper1}))));
+    l1.setData(safe(vwapData.series.map(d=>({time:d.time,value:d.lower1}))));
+    u2.setData(safe(vwapData.series.map(d=>({time:d.time,value:d.upper2}))));
+    l2.setData(safe(vwapData.series.map(d=>({time:d.time,value:d.lower2}))));
+    S.vwapLines[chartId]=[mainLine,u1,l1,u2,l2];
+  }catch(e){console.warn('drawVWAPLines error:',e);}
 }
 
 // ── 피보선 차트에 그리기 (얇은선, 핵심 레벨만 우측 가격 레이블) ──
@@ -1268,8 +1271,11 @@ async function recompute(){
   const vp=calcVP(d1h,20);
 
   // VWAP (스캘핑용: 3분, 15분 각각 계산)
-  const vwap3m=calcVWAP(d3||[]);
-  const vwap15m=calcVWAP(d15||[]);
+  let vwap3m=null,vwap15m=null;
+  try{
+    if(d3?.length>2)vwap3m=calcVWAP(d3);
+    if(d15?.length>2)vwap15m=calcVWAP(d15);
+  }catch(e){console.warn('VWAP calc error:',e);}
 
   // 당일 고저 (1D 마지막봉)
   const dayHigh=d1d?.length?d1d[d1d.length-1].high:null;
@@ -1282,8 +1288,8 @@ async function recompute(){
   });
 
   // VWAP 그리기 (3분/15분만 - 스캘핑용)
-  drawVWAPLines('c3m',vwap3m);
-  drawVWAPLines('c15m',vwap15m);
+  if(vwap3m)drawVWAPLines('c3m',vwap3m);
+  if(vwap15m)drawVWAPLines('c15m',vwap15m);
 
   // 지표 계산 및 차트 세팅
   const ind3=setIndCharts('c3m',d3||[]);
@@ -1373,14 +1379,19 @@ async function recompute(){
   document.getElementById('hcoin').textContent=S.coin.name+'/USDT';
 
   // VWAP 헤더 업데이트
-  if(vwap3m?.last){
-    const vw=vwap3m.last.vwap;
-    const arrow=vwap3m.slope>0.05?'↑':vwap3m.slope<-0.05?'↓':'→';
-    const diff=((price-vw)/vw*100).toFixed(2);
-    const sign=diff>=0?'+':'';
-    document.getElementById('hvwap').textContent=`$${fu(vw)} ${arrow}${sign}${diff}%`;
-    document.getElementById('hvwap').style.color=price>vw?'#0a7a6a':price<vw?'#c0392b':'#1971c2';
-  }
+  try{
+    if(vwap3m?.last?.vwap&&isFinite(vwap3m.last.vwap)){
+      const vw=vwap3m.last.vwap;
+      const arrow=vwap3m.slope>0.05?'↑':vwap3m.slope<-0.05?'↓':'→';
+      const diff=((price-vw)/vw*100).toFixed(2);
+      const sign=diff>=0?'+':'';
+      const el=document.getElementById('hvwap');
+      if(el){
+        el.textContent=`$${fu(vw)} ${arrow}${sign}${diff}%`;
+        el.style.color=price>vw?'#0a7a6a':price<vw?'#c0392b':'#1971c2';
+      }
+    }
+  }catch(e){console.warn('VWAP header error:',e);}
 
   // 진입 마커 (8점 이상, 롱/숏 모두)
   ['c3m','c15m'].forEach(id=>{
