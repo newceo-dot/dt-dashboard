@@ -889,50 +889,11 @@ function calcScore(ind,fib,vp,price,overallDir){
   return{score:s,checks:ch};
 }
 
-// ── 피보 레이블 오버레이 (차트 내 우측 DOM 텍스트) ──
+// ── 피보 레이블: 차트에 그리지 않음 (사이드 패널에 이미 fibdiv 있음) ──
 function drawFibOverlay(chartId,fib,dayHigh,dayLow){
   const oldEl=document.getElementById('fib-ov-'+chartId);
   if(oldEl)oldEl.remove();
-  const chartEl=document.getElementById(chartId);
-  if(!chartEl||!fib)return;
-  const fu2=n=>{if(!n&&n!==0)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
-  const price=S.prices[S.coin.code]?.price||0;
-
-  const cfg=[
-    {lv:0.236,color:'#1971c2',label:'0.236'},
-    {lv:0.382,color:'#0a7a6a',label:'0.382'},
-    {lv:0.5,  color:'#666',   label:'0.500'},
-    {lv:0.618,color:'#c8860a',label:'0.618'},
-    {lv:0.786,color:'#c0392b',label:'★0.786'},
-    {lv:1,    color:'#999',   label:'SL'},
-  ];
-
-  const div=document.createElement('div');
-  div.id='fib-ov-'+chartId;
-  div.style.cssText='position:absolute;top:4px;left:6px;z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:1px;';
-
-  if(dayHigh&&(chartId==='c3m'||chartId==='c15m')){
-    const r=document.createElement('div');
-    r.style.cssText='font-size:8px;font-weight:700;color:rgba(192,57,43,0.8);background:rgba(255,255,255,0.75);padding:1px 4px;border-radius:2px;';
-    r.textContent=`일고 $${fu2(dayHigh)}`;
-    div.appendChild(r);
-    const r2=document.createElement('div');
-    r2.style.cssText='font-size:8px;font-weight:700;color:rgba(10,122,106,0.8);background:rgba(255,255,255,0.75);padding:1px 4px;border-radius:2px;';
-    r2.textContent=`일저 $${fu2(dayLow)}`;
-    div.appendChild(r2);
-  }
-
-  cfg.forEach(({lv,color,label})=>{
-    const p=fib.levels[lv];if(!p)return;
-    const isNear=price&&Math.abs(price-p)/price<0.008;
-    const row=document.createElement('div');
-    row.style.cssText=`font-size:8px;font-weight:${isNear?'900':'600'};color:${color};background:rgba(255,255,255,${isNear?'0.92':'0.72'});padding:1px 4px;border-radius:2px;${isNear?'border:1px solid '+color+';':''}`;
-    row.textContent=`${label} $${fu2(p)}${isNear?' ◀':''}`;
-    div.appendChild(row);
-  });
-
-  chartEl.style.position='relative';
-  chartEl.appendChild(div);
+  // 차트 위에 DOM 안 그림 - 캔들 가려짐 방지
 }
 
 // ── EMA 차트에 그리기 + 일봉 EMA 수평선 ──
@@ -966,7 +927,7 @@ function drawEMALines(chartId,data,ema60_1d,ema200_1d){
   }
 }
 
-// ── 피보선 차트에 그리기 (얇은선 + 차트내 레이블 오버레이) ──
+// ── 피보선 차트에 그리기 (얇은선, 핵심 레벨만 우측 가격 레이블) ──
 function drawFibLines(chartId,fib,dayHigh,dayLow){
   const chart=S.charts[chartId];
   const ser=S.series[chartId];
@@ -975,35 +936,30 @@ function drawFibLines(chartId,fib,dayHigh,dayLow){
   S.fibLines[chartId]=[];
 
   const fibCfg=[
-    {lv:0,    color:'rgba(120,120,120,0.3)', w:1},
-    {lv:0.236,color:'rgba(26,95,180,0.5)',   w:1},
-    {lv:0.382,color:'rgba(10,122,106,0.5)',  w:1},
-    {lv:0.5,  color:'rgba(26,95,180,0.3)',   w:1},
-    {lv:0.618,color:'rgba(200,134,10,0.7)',  w:1},
-    {lv:0.786,color:'rgba(192,57,43,0.85)',  w:1.5},
-    {lv:1,    color:'rgba(100,100,100,0.4)', w:1},
-    {lv:1.618,color:'rgba(10,122,106,0.4)',  w:1},
+    {lv:0.236,color:'rgba(26,95,180,0.5)',   w:1, show:false},
+    {lv:0.382,color:'rgba(10,122,106,0.5)',  w:1, show:false},
+    {lv:0.5,  color:'rgba(120,120,120,0.3)', w:1, show:false},
+    {lv:0.618,color:'rgba(200,134,10,0.7)',  w:1, show:true,  label:'.618'},
+    {lv:0.786,color:'rgba(192,57,43,0.85)',  w:1.5, show:true, label:'★.786'},
+    {lv:1,    color:'rgba(100,100,100,0.4)', w:1, show:true,  label:'SL'},
   ];
-  fibCfg.forEach(({lv,color,w})=>{
+  fibCfg.forEach(({lv,color,w,show,label})=>{
     const p=fib.levels[lv];if(!p)return;
     const line=ser.createPriceLine({
       price:p,color,lineWidth:w,
       lineStyle:LightweightCharts.LineStyle.Dashed,
-      axisLabelVisible:false,
-      title:'',
+      axisLabelVisible:!!show,
+      title:show?label:'',
     });
     S.fibLines[chartId].push(line);
   });
 
-  // 당일 고저 얇은 점선
+  // 당일 고저 (얇은 점선만, 레이블 없음)
   if((chartId==='c3m'||chartId==='c15m')&&dayHigh&&dayLow){
-    const dh=ser.createPriceLine({price:dayHigh,color:'rgba(192,57,43,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
-    const dl=ser.createPriceLine({price:dayLow,color:'rgba(10,122,106,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+    const dh=ser.createPriceLine({price:dayHigh,color:'rgba(192,57,43,0.35)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+    const dl=ser.createPriceLine({price:dayLow,color:'rgba(10,122,106,0.35)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
     S.fibLines[chartId].push(dh,dl);
   }
-
-  // 차트 우상단에 레이블 오버레이 (DOM)
-  drawFibOverlay(chartId,fib,dayHigh,dayLow);
 }
 
 // ── 지표 차트 데이터 세팅 ──
@@ -1045,55 +1001,11 @@ function drawVPLines(chartId,vp){
   add(vp.val,'rgba(10,122,106,0.5)');
 }
 
-// ── Volume Profile 반투명 박스 오버레이 (캔버스 위) ──
+// ── Volume Profile 오버레이: 캔들 가림 방지 위해 비활성화 ──
 function drawVPOverlay(chartId,vp,data){
-  const containerId=chartId;
   const oldCanvas=document.getElementById('vp-canvas-'+chartId);
   if(oldCanvas)oldCanvas.remove();
-  if(!vp||!data||!data.length)return;
-  const chartEl=document.getElementById(containerId);
-  if(!chartEl)return;
-  const chart=S.charts[chartId];if(!chart)return;
-
-  const canvas=document.createElement('canvas');
-  canvas.id='vp-canvas-'+chartId;
-  canvas.style.cssText='position:absolute;right:0;top:0;pointer-events:none;z-index:3;';
-  chartEl.style.position='relative';
-  chartEl.appendChild(canvas);
-
-  function render(){
-    const w=58,h=chartEl.offsetHeight;
-    canvas.width=w;canvas.height=h;
-    const ctx=canvas.getContext('2d');
-    ctx.clearRect(0,0,w,h);
-    if(!vp||!vp.bk.length)return;
-    const maxV=vp.maxV;
-    const priceRange=chart.priceScale('right');
-    // 각 bin을 캔버스에 그리기
-    vp.bk.forEach(bin=>{
-      const ratio=bin.vol/maxV;
-      if(ratio<0.05)return;
-      const isPOC=bin.price===vp.poc.price;
-      const isVA=bin.price>=vp.val&&bin.price<=vp.vah;
-      const barW=Math.max(4,ratio*w*0.85);
-      // y 좌표는 priceToCoordinate 사용
-      const yCenter=chart.priceScale('right').priceToCoordinate?null:null;
-      const y=chart.timeScale?null:null;
-      // lightweight-charts의 series coordinate API 사용
-      const ser=S.series[chartId];
-      if(!ser||!ser.priceToCoordinate)return;
-      const yCoord=ser.priceToCoordinate(bin.price);
-      if(yCoord===null||yCoord<0||yCoord>h)return;
-      const barH=Math.max(3,ratio*18);
-      ctx.fillStyle=isPOC?'rgba(200,134,10,0.45)':isVA?'rgba(10,122,106,0.22)':'rgba(100,120,180,0.13)';
-      ctx.fillRect(0,yCoord-barH/2,barW,barH);
-      if(isPOC){ctx.strokeStyle='rgba(200,134,10,0.7)';ctx.lineWidth=1;ctx.strokeRect(0,yCoord-barH/2,barW,barH);}
-    });
-  }
-  render();
-  new ResizeObserver(render).observe(chartEl);
-  chart.subscribeCrosshairMove(render);
-  chart.timeScale().subscribeVisibleTimeRangeChange(render);
+  // VP는 사이드 패널에 이미 막대그래프로 표시되므로 차트 위에 안 그림
 }
 
 // ── 1시간봉 기준 매물대(클러스터) 감지 ──
@@ -1150,25 +1062,10 @@ function drawClusterLines(chartId,clusters){
   drawClusterOverlay(chartId,clusters);
 }
 
-// ── 매물대 오버레이 레이블 (차트 우측 내부) ──
+// ── 매물대 오버레이: 차트에 안 그림 ──
 function drawClusterOverlay(chartId,clusters){
   const oldEl=document.getElementById('cl-ov-'+chartId);
   if(oldEl)oldEl.remove();
-  if(!clusters.length)return;
-  const chartEl=document.getElementById(chartId);if(!chartEl)return;
-  const fu2=n=>{if(!n&&n!==0)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
-  const div=document.createElement('div');
-  div.id='cl-ov-'+chartId;
-  div.style.cssText='position:absolute;top:4px;right:65px;z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:1px;align-items:flex-end;';
-  clusters.forEach(cl=>{
-    const isStrong=cl.count>=3||cl.hasEma1d;
-    const row=document.createElement('div');
-    row.style.cssText=`font-size:8px;font-weight:700;color:${isStrong?'#c0392b':'#856404'};background:rgba(255,255,255,0.82);padding:1px 4px;border-radius:2px;`;
-    row.textContent=`${'★'.repeat(Math.min(cl.count,3))} $${fu2(cl.price)}`;
-    div.appendChild(row);
-  });
-  chartEl.style.position='relative';
-  chartEl.appendChild(div);
 }
 
 // ── 방향 판단 (롱/숏 모두 감지) ──
