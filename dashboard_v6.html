@@ -889,44 +889,84 @@ function calcScore(ind,fib,vp,price,overallDir){
   return{score:s,checks:ch};
 }
 
+// ── 피보 레이블 오버레이 (차트 내 우측 DOM 텍스트) ──
+function drawFibOverlay(chartId,fib,dayHigh,dayLow){
+  const oldEl=document.getElementById('fib-ov-'+chartId);
+  if(oldEl)oldEl.remove();
+  const chartEl=document.getElementById(chartId);
+  if(!chartEl||!fib)return;
+  const fu2=n=>{if(!n&&n!==0)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
+  const price=S.prices[S.coin.code]?.price||0;
+
+  const cfg=[
+    {lv:0.236,color:'#1971c2',label:'0.236'},
+    {lv:0.382,color:'#0a7a6a',label:'0.382'},
+    {lv:0.5,  color:'#666',   label:'0.500'},
+    {lv:0.618,color:'#c8860a',label:'0.618'},
+    {lv:0.786,color:'#c0392b',label:'★0.786'},
+    {lv:1,    color:'#999',   label:'SL'},
+  ];
+
+  const div=document.createElement('div');
+  div.id='fib-ov-'+chartId;
+  div.style.cssText='position:absolute;top:4px;left:6px;z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:1px;';
+
+  if(dayHigh&&(chartId==='c3m'||chartId==='c15m')){
+    const r=document.createElement('div');
+    r.style.cssText='font-size:8px;font-weight:700;color:rgba(192,57,43,0.8);background:rgba(255,255,255,0.75);padding:1px 4px;border-radius:2px;';
+    r.textContent=`일고 $${fu2(dayHigh)}`;
+    div.appendChild(r);
+    const r2=document.createElement('div');
+    r2.style.cssText='font-size:8px;font-weight:700;color:rgba(10,122,106,0.8);background:rgba(255,255,255,0.75);padding:1px 4px;border-radius:2px;';
+    r2.textContent=`일저 $${fu2(dayLow)}`;
+    div.appendChild(r2);
+  }
+
+  cfg.forEach(({lv,color,label})=>{
+    const p=fib.levels[lv];if(!p)return;
+    const isNear=price&&Math.abs(price-p)/price<0.008;
+    const row=document.createElement('div');
+    row.style.cssText=`font-size:8px;font-weight:${isNear?'900':'600'};color:${color};background:rgba(255,255,255,${isNear?'0.92':'0.72'});padding:1px 4px;border-radius:2px;${isNear?'border:1px solid '+color+';':''}`;
+    row.textContent=`${label} $${fu2(p)}${isNear?' ◀':''}`;
+    div.appendChild(row);
+  });
+
+  chartEl.style.position='relative';
+  chartEl.appendChild(div);
+}
+
 // ── EMA 차트에 그리기 + 일봉 EMA 수평선 ──
 function drawEMALines(chartId,data,ema60_1d,ema200_1d){
   const chart=S.charts[chartId];if(!chart||!data||data.length<20)return;
   if(S.emaLines[chartId])S.emaLines[chartId].forEach(l=>{try{chart.removeSeries(l);}catch(e){}});
   S.emaLines[chartId]=[];
   const ser=S.series[chartId];
-  const fu2=n=>{if(!n)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
 
-  const e20=chart.addLineSeries({color:'#1971c2',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'EMA20'});
-  const e60=chart.addLineSeries({color:'#c8860a',lineWidth:1,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'EMA60'});
+  const e20=chart.addLineSeries({color:'rgba(25,113,194,0.7)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
+  const e60=chart.addLineSeries({color:'rgba(200,134,10,0.7)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
   e20.setData(emaSeries(data,20));
   e60.setData(emaSeries(data,60));
   S.emaLines[chartId]=[e20,e60];
 
   if(data.length>=200){
-    const e200=chart.addLineSeries({color:'#862e9c',lineWidth:1.5,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'EMA200'});
+    const e200=chart.addLineSeries({color:'rgba(134,46,156,0.7)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
     e200.setData(emaSeries(data,200));
     S.emaLines[chartId].push(e200);
   }
 
-  // 일봉 EMA 지지/저항 수평선 (전 차트에 표시)
+  // 일봉 EMA 수평선 — 축 레이블 없이, 얇게
   if(!ser)return;
-  const price=S.prices[S.coin.code]?.price||data[data.length-1]?.close||0;
   if(ema200_1d){
-    const near=price&&Math.abs(price-ema200_1d)/price<0.005;
-    const lbl=price>ema200_1d?`1D EMA200 지지 $${fu2(ema200_1d)}`:`1D EMA200 저항 $${fu2(ema200_1d)}`;
-    const l=ser.createPriceLine({price:ema200_1d,color:near?'#862e9c':'rgba(134,46,156,0.5)',lineWidth:near?2:1.5,lineStyle:LightweightCharts.LineStyle.LargeDashed,axisLabelVisible:true,title:lbl});
+    const l=ser.createPriceLine({price:ema200_1d,color:'rgba(134,46,156,0.45)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.LargeDashed,axisLabelVisible:false,title:''});
     S.emaLines[chartId].push(l);
   }
   if(ema60_1d){
-    const near=price&&Math.abs(price-ema60_1d)/price<0.005;
-    const lbl=price>ema60_1d?`1D EMA60 지지 $${fu2(ema60_1d)}`:`1D EMA60 저항 $${fu2(ema60_1d)}`;
-    const l=ser.createPriceLine({price:ema60_1d,color:near?'#c8860a':'rgba(200,134,10,0.45)',lineWidth:near?2:1.5,lineStyle:LightweightCharts.LineStyle.LargeDashed,axisLabelVisible:true,title:lbl});
+    const l=ser.createPriceLine({price:ema60_1d,color:'rgba(200,134,10,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.LargeDashed,axisLabelVisible:false,title:''});
     S.emaLines[chartId].push(l);
   }
 }
 
-// ── 피보선 차트에 그리기 (당일고저 얇은선 + 1H파동 굵은선 + 가격레이블) ──
+// ── 피보선 차트에 그리기 (얇은선 + 차트내 레이블 오버레이) ──
 function drawFibLines(chartId,fib,dayHigh,dayLow){
   const chart=S.charts[chartId];
   const ser=S.series[chartId];
@@ -934,41 +974,36 @@ function drawFibLines(chartId,fib,dayHigh,dayLow){
   if(S.fibLines[chartId])S.fibLines[chartId].forEach(l=>{try{ser.removePriceLine(l);}catch(e){}});
   S.fibLines[chartId]=[];
 
-  const price=S.prices[S.coin.code]?.price||0;
-  const fu2=n=>{if(!n)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
-
-  // 1H 파동 기준 피보 레벨
   const fibCfg=[
-    {lv:0,    color:'rgba(120,120,120,0.4)', w:1, style:LightweightCharts.LineStyle.Dashed},
-    {lv:0.236,color:'rgba(26,95,180,0.7)',   w:2, style:LightweightCharts.LineStyle.Solid, key:'TP2'},
-    {lv:0.382,color:'rgba(10,122,106,0.7)',  w:1, style:LightweightCharts.LineStyle.Dashed, key:'TP1'},
-    {lv:0.5,  color:'rgba(26,95,180,0.45)', w:1, style:LightweightCharts.LineStyle.Dashed},
-    {lv:0.618,color:'rgba(200,134,10,0.85)', w:2, style:LightweightCharts.LineStyle.Solid, key:'0.618'},
-    {lv:0.786,color:'rgba(192,57,43,0.95)', w:3, style:LightweightCharts.LineStyle.Solid, key:'★진입'},
-    {lv:1,    color:'rgba(100,100,100,0.5)', w:1, style:LightweightCharts.LineStyle.Dashed, key:'SL'},
-    {lv:1.618,color:'rgba(10,122,106,0.55)', w:1, style:LightweightCharts.LineStyle.Dashed, key:'TP3'},
+    {lv:0,    color:'rgba(120,120,120,0.3)', w:1},
+    {lv:0.236,color:'rgba(26,95,180,0.5)',   w:1},
+    {lv:0.382,color:'rgba(10,122,106,0.5)',  w:1},
+    {lv:0.5,  color:'rgba(26,95,180,0.3)',   w:1},
+    {lv:0.618,color:'rgba(200,134,10,0.7)',  w:1},
+    {lv:0.786,color:'rgba(192,57,43,0.85)',  w:1.5},
+    {lv:1,    color:'rgba(100,100,100,0.4)', w:1},
+    {lv:1.618,color:'rgba(10,122,106,0.4)',  w:1},
   ];
-  fibCfg.forEach(({lv,color,w,style,key})=>{
+  fibCfg.forEach(({lv,color,w})=>{
     const p=fib.levels[lv];if(!p)return;
-    const isNear=price&&Math.abs(price-p)/price<0.008;
-    const pxLabel=`$${fu2(p)}`;
-    const title=key?`${key} ${pxLabel}`:pxLabel;
     const line=ser.createPriceLine({
-      price:p,color:isNear?'#ff6b00':color,
-      lineWidth:isNear?w+1:w,
-      lineStyle:style,
-      axisLabelVisible:true,
-      title,
+      price:p,color,lineWidth:w,
+      lineStyle:LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible:false,
+      title:'',
     });
     S.fibLines[chartId].push(line);
   });
 
-  // 당일 고저 얇은선 (1분~3분 차트에만)
+  // 당일 고저 얇은 점선
   if((chartId==='c3m'||chartId==='c15m')&&dayHigh&&dayLow){
-    const dh=ser.createPriceLine({price:dayHigh,color:'rgba(192,57,43,0.5)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:true,title:`일고 $${fu2(dayHigh)}`});
-    const dl=ser.createPriceLine({price:dayLow,color:'rgba(10,122,106,0.5)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:true,title:`일저 $${fu2(dayLow)}`});
+    const dh=ser.createPriceLine({price:dayHigh,color:'rgba(192,57,43,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+    const dl=ser.createPriceLine({price:dayLow,color:'rgba(10,122,106,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
     S.fibLines[chartId].push(dh,dl);
   }
+
+  // 차트 우상단에 레이블 오버레이 (DOM)
+  drawFibOverlay(chartId,fib,dayHigh,dayLow);
 }
 
 // ── 지표 차트 데이터 세팅 ──
@@ -999,16 +1034,15 @@ function setIndCharts(prefix,data){
   return{rsi,macd,stoch};
 }
 
-// ── VP 선 ──
+// ── VP 선 (얇게, 축레이블 없음) ──
 function drawVPLines(chartId,vp){
   const ser=S.series[chartId];if(!ser||!vp)return;
   if(S.vpLines[chartId])S.vpLines[chartId].forEach(l=>{try{ser.removePriceLine(l);}catch(e){}});
   S.vpLines[chartId]=[];
-  const fu2=n=>{if(!n)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
-  const add=(price,color,title,w=1)=>{const l=ser.createPriceLine({price,color,lineWidth:w,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:true,title});S.vpLines[chartId].push(l);};
-  add(vp.poc.price,'rgba(200,134,10,0.9)',`POC $${fu2(vp.poc.price)}`,2);
-  add(vp.vah,'rgba(10,122,106,0.7)',`VAH $${fu2(vp.vah)}`);
-  add(vp.val,'rgba(10,122,106,0.7)',`VAL $${fu2(vp.val)}`);
+  const add=(price,color,w=1)=>{const l=ser.createPriceLine({price,color,lineWidth:w,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});S.vpLines[chartId].push(l);};
+  add(vp.poc.price,'rgba(200,134,10,0.7)',1.5);
+  add(vp.vah,'rgba(10,122,106,0.5)');
+  add(vp.val,'rgba(10,122,106,0.5)');
 }
 
 // ── Volume Profile 반투명 박스 오버레이 (캔버스 위) ──
@@ -1101,19 +1135,40 @@ function detectClusters(fib,vp,ema20_1h,ema60_1h,ema200_1h,ema60_1d,ema200_1d){
   return clusters;
 }
 
-// ── 매물대 클러스터 수평선 그리기 ──
+// ── 매물대 클러스터 수평선 (얇게, 축레이블 없음) ──
 function drawClusterLines(chartId,clusters){
   const ser=S.series[chartId];if(!ser)return;
   if(S.clusterLines[chartId])S.clusterLines[chartId].forEach(l=>{try{ser.removePriceLine(l);}catch(e){}});
   S.clusterLines[chartId]=[];
-  const fu2=n=>{if(!n)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
   clusters.forEach(cl=>{
     const isStrong=cl.count>=3||cl.hasEma1d;
-    const color=isStrong?'rgba(220,80,30,0.85)':'rgba(200,160,0,0.75)';
-    const label=`${'★'.repeat(Math.min(cl.count,3))} 매물대 $${fu2(cl.price)} (${cl.labels.slice(0,3).join('·')})`;
-    const l=ser.createPriceLine({price:cl.price,color,lineWidth:isStrong?2:1.5,lineStyle:LightweightCharts.LineStyle.SparseDotted,axisLabelVisible:true,title:label});
+    const color=isStrong?'rgba(220,80,30,0.6)':'rgba(200,160,0,0.5)';
+    const l=ser.createPriceLine({price:cl.price,color,lineWidth:1,lineStyle:LightweightCharts.LineStyle.SparseDotted,axisLabelVisible:false,title:''});
     S.clusterLines[chartId].push(l);
   });
+  // 클러스터 오버레이 레이블
+  drawClusterOverlay(chartId,clusters);
+}
+
+// ── 매물대 오버레이 레이블 (차트 우측 내부) ──
+function drawClusterOverlay(chartId,clusters){
+  const oldEl=document.getElementById('cl-ov-'+chartId);
+  if(oldEl)oldEl.remove();
+  if(!clusters.length)return;
+  const chartEl=document.getElementById(chartId);if(!chartEl)return;
+  const fu2=n=>{if(!n&&n!==0)return'';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(1);return n.toFixed(4);};
+  const div=document.createElement('div');
+  div.id='cl-ov-'+chartId;
+  div.style.cssText='position:absolute;top:4px;right:65px;z-index:10;pointer-events:none;display:flex;flex-direction:column;gap:1px;align-items:flex-end;';
+  clusters.forEach(cl=>{
+    const isStrong=cl.count>=3||cl.hasEma1d;
+    const row=document.createElement('div');
+    row.style.cssText=`font-size:8px;font-weight:700;color:${isStrong?'#c0392b':'#856404'};background:rgba(255,255,255,0.82);padding:1px 4px;border-radius:2px;`;
+    row.textContent=`${'★'.repeat(Math.min(cl.count,3))} $${fu2(cl.price)}`;
+    div.appendChild(row);
+  });
+  chartEl.style.position='relative';
+  chartEl.appendChild(div);
 }
 
 // ── 방향 판단 (롱/숏 모두 감지) ──
