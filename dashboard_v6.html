@@ -196,6 +196,66 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
 .ait{display:inline-block;margin-right:24px;}
 .aa{color:var(--go);font-weight:700;}.am{color:var(--gn);font-weight:600;}
 #bclk{color:var(--tx2);font-size:9px;font-weight:600;white-space:nowrap;}
+
+/* === 햄버거 메뉴 (모바일 전용) === */
+.mb-menu-btn{display:none;background:var(--bg2);border:1px solid var(--bd);color:var(--tx);padding:4px 8px;border-radius:3px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.mb-tabs{display:none;background:var(--bg2);border-bottom:1px solid var(--bd);padding:4px;gap:3px;overflow-x:auto;white-space:nowrap;}
+.mb-tab{background:var(--bg3);border:1px solid var(--bd);color:var(--tx2);padding:6px 12px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;flex-shrink:0;}
+.mb-tab.active{background:var(--bl);color:#fff;border-color:var(--bl);}
+
+/* === 태블릿 (1100px 이하) === */
+@media (max-width:1100px){
+  #sc{width:90px;}
+  #ip{width:200px;}
+  .iv{font-size:10px;}
+  .pv{font-size:10px;}
+}
+
+/* === 모바일 / Z폴드 접힘 (700px 이하) === */
+@media (max-width:700px){
+  html,body{overflow:auto;height:auto;min-height:100%;}
+  body{display:flex;flex-direction:column;}
+  #hd{flex-wrap:wrap;padding:6px;gap:6px;height:auto;min-height:48px;position:sticky;top:0;z-index:100;}
+  .logo{font-size:14px;}
+  .hb{padding:3px 6px;gap:3px;}
+  .hl{font-size:8px;}
+  .hv{font-size:11px;}
+  #sig{display:none;}
+  .mb-menu-btn{display:block;margin-left:auto;}
+  
+  #main{flex-direction:column;height:auto;overflow:visible;}
+  
+  /* 사이드바 → 가로 스크롤 */
+  #sc{width:100%;height:auto;max-height:80px;flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid var(--bd);}
+  #sc>div:first-child{display:none;}
+  .ci{flex-shrink:0;min-width:80px;padding:6px 8px;border-bottom:none;border-right:1px solid var(--bd);}
+  
+  /* 차트 영역 - 탭 시스템 */
+  .mb-tabs{display:flex;position:sticky;top:48px;z-index:90;}
+  #ca{display:block !important;grid-template-columns:none !important;height:auto;padding:0;overflow:visible;}
+  #ca > div{display:contents;} /* 좌/우 컬럼 래퍼는 contents로 풀어줌 */
+  [data-mb-chart]{display:none !important;}
+  [data-mb-chart].mb-show{display:flex !important;height:65vh;min-height:380px;margin:4px;}
+  
+  /* 정보 패널 → 모바일에서 토글 */
+  #ip{position:fixed;top:0;right:-280px;height:100vh;width:260px;z-index:200;transition:right 0.25s;box-shadow:-4px 0 12px rgba(0,0,0,0.15);border-left:1px solid var(--bd);}
+  #ip.mb-open{right:0;}
+  #ip-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:150;}
+  #ip-overlay.mb-show{display:block;}
+  
+  /* 알림 바 */
+  #ab{flex-wrap:wrap;height:auto;padding:4px 6px;}
+}
+
+/* === Z폴드 작은 커버 화면 (376px 이하) === */
+@media (max-width:400px){
+  #hd{padding:4px;}
+  .hb{padding:2px 4px;}
+  .hl{font-size:7px;}
+  .hv{font-size:10px;}
+  .logo{font-size:12px;}
+  .mb-tab{padding:5px 10px;font-size:10px;}
+}
 </style>
 </head>
 <body>
@@ -207,6 +267,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
   <div class="hb"><span class="hl">파동위치</span><span class="hv" id="hwpos" style="font-size:11px;color:var(--go)">--</span></div>
   <div class="hb"><span class="hl">상승확률</span><span class="hv" id="hprob" style="color:var(--gn)">--%</span></div>
   <div class="hb"><span class="hl">점수</span><span class="hv" id="hscr" style="color:var(--go)">--</span></div>
+  <div class="hb"><span class="hl">VWAP(3m)</span><span class="hv" id="hvwap" style="color:#1971c2;font-size:11px">--</span></div>
   <div id="sig">
     <div class="si"><div class="sd" id="d-trend"></div><span>추세</span></div>
     <div class="si"><div class="sd" id="d-fib"></div><span>피보</span></div>
@@ -214,7 +275,19 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
     <button id="hline-btn" onclick="toggleHLineMode()" style="padding:2px 8px;border-radius:3px;font-size:9px;font-weight:700;border:1px solid var(--bd);background:var(--bg2);color:var(--tx2);cursor:pointer;font-family:inherit;">✏ 수평선</button>
     <div id="wst" class="off">● OFF</div>
   </div>
+  <button class="mb-menu-btn" onclick="toggleMobilePanel()">☰ 정보</button>
 </div>
+
+<!-- 모바일 차트 탭 -->
+<div class="mb-tabs" id="mb-tabs">
+  <button class="mb-tab active" data-mb="c1h">1H</button>
+  <button class="mb-tab" data-mb="c3m">3M</button>
+  <button class="mb-tab" data-mb="c15m">15M</button>
+  <button class="mb-tab" data-mb="c4h">4H</button>
+  <button class="mb-tab" data-mb="c1d">1D</button>
+</div>
+
+<div id="ip-overlay" onclick="toggleMobilePanel()"></div>
 
 <div id="main">
 
@@ -230,7 +303,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
   <!-- 좌: 3분+지표+15분+지표 -->
   <div style="display:flex;flex-direction:column;gap:2px;overflow:hidden;min-height:0;">
 
-    <div style="flex:1.5;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+    <div data-mb-chart="c3m" style="flex:1.5;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
       <div class="ch">
         <span class="ctf tf3">3분</span>
         <div style="display:flex;gap:2px;margin-left:4px;">
@@ -270,7 +343,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
       <div style="flex:1;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;" id="c3m-stoch"></div></div>
     </div>
 
-    <div style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+    <div data-mb-chart="c15m" style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
       <div class="ch">
         <span class="ctf tf15">15분</span>
         <div style="display:flex;gap:2px;margin-left:4px;">
@@ -314,7 +387,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
   <!-- 우: 1시간+4시간+일봉 -->
   <div style="display:flex;flex-direction:column;gap:2px;overflow:hidden;min-height:0;">
 
-    <div style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+    <div data-mb-chart="c1h" style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
       <div class="ch">
         <span class="ctf tf1h">1시간</span>
         <div class="ch-ohlc" id="ohlc1h"></div>
@@ -323,7 +396,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
       <div style="flex:1;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;" id="c1h"></div></div>
     </div>
 
-    <div style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+    <div data-mb-chart="c4h" style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
       <div class="ch">
         <span class="ctf tf4h">4시간</span>
         <div class="ch-ohlc" id="ohlc4h"></div>
@@ -332,7 +405,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
       <div style="flex:1;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;" id="c4h"></div></div>
     </div>
 
-    <div style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+    <div data-mb-chart="c1d" style="flex:1;min-height:80px;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
       <div class="ch">
         <span class="ctf tf1d">일봉</span>
         <div class="ch-ohlc" id="ohlc1d"></div>
@@ -439,6 +512,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
       <div><span>MACD</span> 1H 골든/데드크로스 확인</div>
       <div><span>스토</span> 롱:20↓ 과매도 / 숏:80↑ 과매수</div>
       <div><span>매물대</span> 1H EMA+VP+피보 겹침 구간</div>
+      <div><span class="must">VWAP</span> 3분 VWAP 위/아래 + 기울기 일치</div>
+      <div><span>±1σ</span> VWAP -1σ 롱 / +1σ 숏 (평균회귀)</div>
       <div class="sl">손절: <b>1.000</b> (파동 끝) 이탈 즉시</div>
       <div class="sl">손익비 1:1.5 미만 진입 금지</div>
       <div><span>8점↑</span> 0.2랏 / <span>14점↑</span> 0.5랏 / <span>18점↑</span> 1.0랏</div>
@@ -483,7 +558,7 @@ const S={
   coin:COINS[0],prices:{},candles:{},
   ws:null,ind:{},plan:{},score:0,
   charts:{},series:{},indSeries:{},fibLines:{},vpLines:{},emaLines:{},
-  clusterLines:{}, hLines:{},
+  clusterLines:{}, hLines:{}, vwapLines:{},
   alerts:[],apiKey:localStorage.getItem('dtv5ak')||'',
   curTF:{c3m:'3m',c15m:'15m'},
   hLineMode:false, // 수평선 클릭 모드
@@ -768,6 +843,47 @@ function calcVP(data,bins=20){
   return{bk,maxV,poc,vah:Math.max(...va.map(b=>b.price)),val:Math.min(...va.map(b=>b.price))};
 }
 
+// ── VWAP (일중 세션, 매일 00:00 UTC 리셋) + ±σ 밴드 ──
+// 반환: 각 캔들마다 {time, vwap, upper1, lower1, upper2, lower2} 시리즈
+function calcVWAP(data){
+  if(!data||data.length<2)return{series:[],last:null,slope:0};
+  const result=[];
+  let dayKey=null,cumPV=0,cumV=0,cumPV2=0;
+  for(const c of data){
+    const ts=c.time*1000;
+    const d=new Date(ts);
+    const key=`${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+    if(key!==dayKey){
+      dayKey=key;cumPV=0;cumV=0;cumPV2=0;
+    }
+    const tp=(c.high+c.low+c.close)/3;
+    const v=c.volume||0;
+    cumPV+=tp*v;
+    cumV+=v;
+    cumPV2+=v*tp*tp;
+    if(cumV<=0){result.push({time:c.time,vwap:tp,upper1:tp,lower1:tp,upper2:tp,lower2:tp});continue;}
+    const vwap=cumPV/cumV;
+    const variance=Math.max(0,(cumPV2/cumV)-vwap*vwap);
+    const sd=Math.sqrt(variance);
+    result.push({
+      time:c.time,
+      vwap,
+      upper1:vwap+sd,
+      lower1:vwap-sd,
+      upper2:vwap+2*sd,
+      lower2:vwap-2*sd,
+    });
+  }
+  const last=result[result.length-1];
+  // 기울기: 최근 10봉 VWAP 변화율
+  let slope=0;
+  if(result.length>=11){
+    const prev=result[result.length-11].vwap;
+    if(prev)slope=((last.vwap-prev)/prev)*100;
+  }
+  return{series:result,last,slope};
+}
+
 // ── 백테스트 ──
 function runBacktest(data1h,fib,ema200_1d){
   if(!data1h||data1h.length<50||!fib)return null;
@@ -840,7 +956,7 @@ function calcProb(ind,fib,price,btResult){
 }
 
 // ── 점수 계산 (롱/숏 방향 구분) ──
-function calcScore(ind,fib,vp,price,overallDir){
+function calcScore(ind,fib,vp,price,overallDir,vwap){
   let s=0;const ch={};
   const ok=(k,l,pts,c)=>{ch[k]={ok:!!c,label:l,score:pts};if(c)s+=pts;};
   const isLong=overallDir==='long';
@@ -858,7 +974,6 @@ function calcScore(ind,fib,vp,price,overallDir){
   const near786=f786&&Math.abs(price-f786)/price<0.012;
   const near618=f618&&Math.abs(price-f618)/price<0.012;
   const near236=f236&&Math.abs(price-f236)/price<0.012;
-  // 파동 방향 일치 필수
   const fibDirOk=fib&&((isLong&&fib.isUp)||(isShort&&!fib.isUp)||(!isLong&&!isShort));
   ok('fib786','피보 ★0.786 진입(메인)',3,fibDirOk&&near786);
   ok('fib618','피보 0.618 근접',2,fibDirOk&&near618&&!near786);
@@ -883,6 +998,26 @@ function calcScore(ind,fib,vp,price,overallDir){
 
   // VP POC 근접
   ok('vp','VOL POC 근접',2,vp&&f786&&Math.abs(vp.poc.price-f786)/f786<0.03);
+
+  // ── VWAP 스캘핑 시그널 ──
+  if(vwap?.last){
+    const vw=vwap.last;
+    const slopeUp=vwap.slope>0.05;
+    const slopeDn=vwap.slope<-0.05;
+    // VWAP 위/아래 안정 + 추세 일치
+    const aboveVwap=price>vw.vwap;
+    const belowVwap=price<vw.vwap;
+    ok('vwap_side',aboveVwap?'VWAP 상단 (매수우위)':belowVwap?'VWAP 하단 (매도우위)':'VWAP 부근',2,
+      isLong?(aboveVwap&&slopeUp):isShort?(belowVwap&&slopeDn):false);
+    // -1σ/+1σ 평균회귀
+    const at_l1=Math.abs(price-vw.lower1)/price<0.002;
+    const at_u1=Math.abs(price-vw.upper1)/price<0.002;
+    ok('vwap_band',isLong?'VWAP -1σ 평균회귀':isShort?'VWAP +1σ 평균회귀':'VWAP ±1σ',3,
+      isLong?at_l1:isShort?at_u1:false);
+  } else {
+    ok('vwap_side','VWAP',2,false);
+    ok('vwap_band','VWAP ±1σ',3,false);
+  }
 
   // 캔들 패턴 (수동)
   ok('candle','캔들 패턴(수동)',1,false);
@@ -925,6 +1060,27 @@ function drawEMALines(chartId,data,ema60_1d,ema200_1d){
     const l=ser.createPriceLine({price:ema60_1d,color:'rgba(200,134,10,0.4)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.LargeDashed,axisLabelVisible:false,title:''});
     S.emaLines[chartId].push(l);
   }
+}
+
+// ── VWAP + ±σ 밴드 그리기 (스캘핑용: 3분/15분만) ──
+function drawVWAPLines(chartId,vwapData){
+  const chart=S.charts[chartId];if(!chart||!vwapData?.series?.length)return;
+  // 기존 시리즈 제거
+  if(S.vwapLines[chartId])S.vwapLines[chartId].forEach(s=>{try{chart.removeSeries(s);}catch(e){}});
+  S.vwapLines[chartId]=[];
+
+  const mainLine=chart.addLineSeries({color:'rgba(26,95,180,0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'VWAP'});
+  const u1=chart.addLineSeries({color:'rgba(26,95,180,0.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
+  const l1=chart.addLineSeries({color:'rgba(26,95,180,0.45)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
+  const u2=chart.addLineSeries({color:'rgba(192,57,43,0.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dotted});
+  const l2=chart.addLineSeries({color:'rgba(10,122,106,0.4)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dotted});
+
+  mainLine.setData(vwapData.series.map(d=>({time:d.time,value:d.vwap})));
+  u1.setData(vwapData.series.map(d=>({time:d.time,value:d.upper1})));
+  l1.setData(vwapData.series.map(d=>({time:d.time,value:d.lower1})));
+  u2.setData(vwapData.series.map(d=>({time:d.time,value:d.upper2})));
+  l2.setData(vwapData.series.map(d=>({time:d.time,value:d.lower2})));
+  S.vwapLines[chartId]=[mainLine,u1,l1,u2,l2];
 }
 
 // ── 피보선 차트에 그리기 (얇은선, 핵심 레벨만 우측 가격 레이블) ──
@@ -1111,6 +1267,10 @@ async function recompute(){
   // VP (1H)
   const vp=calcVP(d1h,20);
 
+  // VWAP (스캘핑용: 3분, 15분 각각 계산)
+  const vwap3m=calcVWAP(d3||[]);
+  const vwap15m=calcVWAP(d15||[]);
+
   // 당일 고저 (1D 마지막봉)
   const dayHigh=d1d?.length?d1d[d1d.length-1].high:null;
   const dayLow=d1d?.length?d1d[d1d.length-1].low:null;
@@ -1120,6 +1280,10 @@ async function recompute(){
     const tf=id==='c3m'?'3m':id==='c15m'?'15m':id==='c1h'?'1h':id==='c4h'?'4h':'1d';
     drawEMALines(id,S.candles[tf],ema60_1d,ema200_1d);
   });
+
+  // VWAP 그리기 (3분/15분만 - 스캘핑용)
+  drawVWAPLines('c3m',vwap3m);
+  drawVWAPLines('c15m',vwap15m);
 
   // 지표 계산 및 차트 세팅
   const ind3=setIndCharts('c3m',d3||[]);
@@ -1186,7 +1350,7 @@ async function recompute(){
   renderProb(prob);
 
   // 점수 (방향 포함)
-  const{score,checks}=calcScore(S.ind,fib,vp,price,overallDir);
+  const{score,checks}=calcScore(S.ind,fib,vp,price,overallDir,vwap3m);
   S.score=score;
   S.plan=makePlan(fib,price,overallDir);
 
@@ -1207,6 +1371,16 @@ async function recompute(){
   }
   document.getElementById('hscr').textContent=score+'점';
   document.getElementById('hcoin').textContent=S.coin.name+'/USDT';
+
+  // VWAP 헤더 업데이트
+  if(vwap3m?.last){
+    const vw=vwap3m.last.vwap;
+    const arrow=vwap3m.slope>0.05?'↑':vwap3m.slope<-0.05?'↓':'→';
+    const diff=((price-vw)/vw*100).toFixed(2);
+    const sign=diff>=0?'+':'';
+    document.getElementById('hvwap').textContent=`$${fu(vw)} ${arrow}${sign}${diff}%`;
+    document.getElementById('hvwap').style.color=price>vw?'#0a7a6a':price<vw?'#c0392b':'#1971c2';
+  }
 
   // 진입 마커 (8점 이상, 롱/숏 모두)
   ['c3m','c15m'].forEach(id=>{
@@ -1290,7 +1464,7 @@ function renderProb(prob){
   if(pb)pb.textContent=prob.factors.join(' | ');
 }
 
-const CLABELS=['trend','fib786','fib618','fib236','ema200','rsi','stoch','macd','ich','vp','candle'];
+const CLABELS=['trend','fib786','fib618','fib236','ema200','rsi','stoch','macd','ich','vp','vwap_side','vwap_band','candle'];
 function renderChecks(ch){
   const el=document.getElementById('chklist');if(!el)return;
   el.innerHTML=CLABELS.map(k=>{
@@ -1417,6 +1591,64 @@ EMA200:$${I.ema200_1d?fu(I.ema200_1d):'--'} 일목:${I.ich?.aboveCloud?'구름�
   btn.disabled=false;btn.textContent='▶ AI 분석 요청';
 }
 
+// ── 모바일 컨트롤 ──
+function showMobileChart(chartKey){
+  document.querySelectorAll('[data-mb-chart]').forEach(el=>{
+    el.classList.toggle('mb-show',el.dataset.mbChart===chartKey);
+  });
+  document.querySelectorAll('.mb-tab').forEach(b=>{
+    b.classList.toggle('active',b.dataset.mb===chartKey);
+  });
+  // 차트 리사이즈 트리거
+  setTimeout(()=>{
+    const c=S.charts[chartKey];
+    const el=document.getElementById(chartKey);
+    if(c&&el)c.resize(el.offsetWidth,el.offsetHeight);
+  },50);
+}
+
+function toggleMobilePanel(){
+  const ip=document.getElementById('ip');
+  const ov=document.getElementById('ip-overlay');
+  if(!ip)return;
+  const isOpen=ip.classList.toggle('mb-open');
+  ov.classList.toggle('mb-show',isOpen);
+}
+
+function initMobile(){
+  const isMobile=window.innerWidth<=700;
+  if(!isMobile)return;
+  // 기본 1H 차트만 표시
+  showMobileChart('c1h');
+  // 탭 클릭 핸들러
+  document.querySelectorAll('.mb-tab').forEach(b=>{
+    b.addEventListener('click',()=>showMobileChart(b.dataset.mb));
+  });
+}
+
+// 화면 회전/리사이즈 감지
+window.addEventListener('resize',()=>{
+  const isMobile=window.innerWidth<=700;
+  if(isMobile){
+    if(!document.querySelector('[data-mb-chart].mb-show')){
+      showMobileChart('c1h');
+    }
+  } else {
+    // PC 모드: 모든 차트 다시 표시
+    document.querySelectorAll('[data-mb-chart]').forEach(el=>el.classList.remove('mb-show'));
+    document.getElementById('ip')?.classList.remove('mb-open');
+    document.getElementById('ip-overlay')?.classList.remove('mb-show');
+    // 모든 차트 리사이즈
+    setTimeout(()=>{
+      Object.keys(S.charts).forEach(k=>{
+        const c=S.charts[k];
+        const el=document.getElementById(k);
+        if(c&&el)c.resize(el.offsetWidth,el.offsetHeight);
+      });
+    },100);
+  }
+});
+
 // ── 유틸 ──
 function fu(n){if(!n&&n!==0)return'--';if(n>=10000)return n.toLocaleString('en',{maximumFractionDigits:0});if(n>=1)return n.toFixed(2);if(n>=0.01)return n.toFixed(4);return n.toFixed(6);}
 function pct(a,b){if(!a||!b)return'0';return((b-a)/a*100).toFixed(1);}
@@ -1428,6 +1660,7 @@ async function init(){
   if(Notification.permission==='default')Notification.requestPermission();
   initCharts();
   renderCoinList();
+  initMobile();
   connectWS();
   await loadAll();
   await recompute();
