@@ -497,101 +497,366 @@ function vwapSession(candles){
 }
 
 // ═══════════════════════════════════════════════
-// 4. SCALPING SIGNAL ENGINE (★ 핵심)
+// 4. SCALPING SIGNAL ENGINE — 100점 시스템
 // ═══════════════════════════════════════════════
-function calcSignal(candles){
-  if(!candles||candles.length<60)return {score:0,dir:'wait',checks:[],plan:null};
-  const closes=candles.map(c=>c.close);
-  const price=closes[closes.length-1];
-  const e20=ema(closes,20),e60=ema(closes,60),e200=closes.length>=200?ema(closes,200):null;
+
+// ── ZigZag 파동 추출 ──
+function zigzag(candles,depth=5,pctThreshold=0.3){
+  if(!candles||candles.length<depth*2)return [];
+  const pivots=[];
+  let dir=0,lastIdx=0,lastPrice=candles[0].close;
+  for(let i=1;i<candles.length;i++){
+    const c=candles[i];
+    const pct=(c.high-lastPrice)/lastPrice*100;
+    const pctDn=(lastPrice-c.low)/lastPrice*100;
+    if(dir>=0&&pctDn>=pctThreshold){
+      pivots.push({idx:lastIdx,price:lastPrice,type:'high',time:candles[lastIdx].time});
+      dir=-1;lastIdx=i;lastPrice=c.low;
+    } else if(dir<=0&&pct>=pctThreshold){
+      pivots.push({idx:lastIdx,price:lastPrice,type:'low',time:candles[lastIdx].time});
+      dir=1;lastIdx=i;lastPrice=c.high;
+    } else {
+      if(dir>=0&&c.high>lastPrice){lastIdx=i;lastPrice=c.high;}
+      if(dir<=0&&c.low<lastPrice){lastIdx=i;lastPrice=c.low;}
+    }
+  }
+  pivots.push({idx:lastIdx,price:lastPrice,type:dir>=0?'high':'low',time:candles[lastIdx].time});
+  return pivots;
+}
+
+// ── 엘리엇 파동 추정 + 피보나치 ──
+function elliottFib(candles){
+  const pivots=zigzag(candles,5,0.4);
+  if(pivots.length<3)return null;
+  // 최근 2개 피벗으로 마지막 파동 정의
+  const last=pivots[pivots.length-1];
+  const prev=pivots[pivots.length-2];
+  const isUp=last.price>prev.price;
+  const hi=Math.max(last.price,prev.price);
+  const lo=Math.min(last.price,prev.price);
+  const diff=hi-lo;
+  // 파동 추정 (단순)
+  let waveLabel='조정파',waveNum='?';
+  if(pivots.length>=5){
+    const w=pivots.slice(-5);
+    const lengths=[];
+    for(let i=1;i<w.length;i++)lengths.push(Math.abs(w[i].price-w[i-1].price));
+    // 3파가 가장 길면 임펄스
+    if(lengths[2]>lengths[0]&&lengths[2]>lengths[4]){
+      waveLabel='임펄스 5파';waveNum='5';
+    } else if(lengths.length>=3){
+      waveLabel='조정 ABC';waveNum='C';
+    }
+  }
+  // 피보 레벨 (역추세 되돌림)
+  const levels={
+    0:isUp?lo:hi,
+    0.236:isUp?(hi-diff*0.236):(lo+diff*0.236),
+    0.382:isUp?(hi-diff*0.382):(lo+diff*0.382),
+    0.5:isUp?(hi-diff*0.5):(lo+diff*0.5),
+    0.618:isUp?(hi-diff*0.618):(lo+diff*0.618),
+    0.786:isUp?(hi-diff*0.786):(lo+diff*0.786),
+    1.0:isUp?lo:hi,
+    1.272:isUp?(hi+diff*0.272):(lo-diff*0.272),
+    1.618:isUp?(hi+diff*0.618):(lo-diff*0.618),
+  };
+  return {pivots,isUp,hi,lo,diff,levels,waveLabel,waveNum,
+    lastPivot:last,prevPivot:prev};
+}
+
+// ── Volume Profile POC ──
+function volumeProfile(candles,bins=24){
+  if(!candles||candles.length<10)return null;
+  const sl=candles.slice(-120);
+  const hi=Math.max(...sl.map(c=>c.high));
+  const lo=Math.min(...sl.map(c=>c.low));
+  if(hi===lo)return null;
+  const step=(hi-lo)/bins;
+  const bk=Array.from({length:bins},(_,i)=>({price:lo+i*step+step/2,vol:0}));
+  sl.forEach(c=>{
+    const tp=(c.high+c.low+c.close)/3;
+    const idx=Math.min(Math.floor((tp-lo)/step),bins-1);
+    if(idx>=0)bk[idx].vol+=c.volume||0;
+  });
+  const maxV=Math.max(...bk.map(b=>b.vol));
+  const poc=bk.reduce((a,b)=>b.vol>a.vol?b:a);
+  const total=bk.reduce((s,b)=>s+b.vol,0);
+  const sorted=[...bk].sort((a,b)=>b.vol-a.vol);
+  let cum=0;const va=new Set();
+  for(const b of sorted){cum+=b.vol;va.add(b.price);if(cum/total>=0.7)break;}
+  const vaArr=bk.filter(b=>va.has(b.price));
+  return {poc:poc.price,vah:Math.max(...vaArr.map(b=>b.price)),val:Math.min(...vaArr.map(b=>b.price)),maxV,bk};
+}
+
+// ── 전일 고저 ──
+function prevDayHL(candles1d){
+  if(!candles1d||candles1d.length<2)return null;
+  const prev=candles1d[candles1d.length-2];
+  return {high:prev.high,low:prev.low,close:prev.close};
+}
+
+// ── 다중 TF ADX 가중 점수 ──
+function multiADXScore(adx5,adx15,adx1h,dirSign){
+  // dirSign: +1 for long, -1 for short
+  let score=0;
+  const details=[];
+  if(adx5){
+    const ok=adx5.lastADX>25;
+    if(ok)score+=5;
+    details.push({tf:'5m',adx:adx5.lastADX,ok,pts:ok?5:0});
+  }
+  if(adx15){
+    const ok=adx15.lastADX>25;
+    if(ok)score+=5;
+    details.push({tf:'15m',adx:adx15.lastADX,ok,pts:ok?5:0});
+  }
+  if(adx1h){
+    const ok=adx1h.lastADX>25;
+    if(ok)score+=10;
+    details.push({tf:'1h',adx:adx1h.lastADX,ok,pts:ok?10:0});
+  }
+  // 추세 일치 보너스
+  const allLong=[adx5,adx15,adx1h].filter(a=>a).every(a=>a.lastPlus>a.lastMinus);
+  const allShort=[adx5,adx15,adx1h].filter(a=>a).every(a=>a.lastMinus>a.lastPlus);
+  let bonus=0;
+  if(dirSign>0&&allLong){score+=5;bonus=5;}
+  else if(dirSign<0&&allShort){score+=5;bonus=5;}
+  return {score,details,bonus,allLong,allShort};
+}
+
+// ── 백테스트 (간단 통계) ──
+function backtest(candles5m){
+  if(!candles5m||candles5m.length<200)return null;
+  const closes=candles5m.map(c=>c.close);
   const r=rsi(closes,14);
-  const m=macd(closes);
-  const ax=adx(candles,14);
-  const st1=stoch(candles,5,3,3);
-  const st2=stoch(candles,14,3,3);
-  const st3=stoch(candles,21,7,7);
-  const vw=vwapSession(candles);
-  const lastRSI=r?r[r.length-1]:null;
-  const prevRSI=r?r[r.length-2]:null;
+  const st1=stoch(candles5m,5,3,3);
+  const st2=stoch(candles5m,14,3,3);
+  if(!r||!st1||!st2)return null;
+  // 과매도+골든 발생 시점들 찾기
+  let longSignals=0,longWins=0,shortSignals=0,shortWins=0;
+  const offR=candles5m.length-r.length;
+  const offS=candles5m.length-st1.k.length;
+  for(let i=20;i<candles5m.length-12;i++){
+    const ri=i-offR,si=i-offS;
+    if(ri<1||si<1)continue;
+    const rsiV=r[ri];
+    const k1=st1.k[si],d1=st1.d[si];
+    const pk1=st1.k[si-1],pd1=st1.d[si-1];
+    // 롱 신호: 과매도 + 골든
+    if(rsiV<35&&k1<25&&k1>d1&&pk1<=pd1){
+      longSignals++;
+      const ep=candles5m[i].close;
+      const futureMax=Math.max(...candles5m.slice(i+1,i+13).map(c=>c.high));
+      const futureMin=Math.min(...candles5m.slice(i+1,i+13).map(c=>c.low));
+      // TP +0.3% 먼저 vs SL -0.2%
+      if((futureMax-ep)/ep>=0.003)longWins++;
+    }
+    // 숏 신호
+    if(rsiV>65&&k1>75&&k1<d1&&pk1>=pd1){
+      shortSignals++;
+      const ep=candles5m[i].close;
+      const futureMin=Math.min(...candles5m.slice(i+1,i+13).map(c=>c.low));
+      if((ep-futureMin)/ep>=0.003)shortWins++;
+    }
+  }
+  return {
+    longWinRate:longSignals>0?Math.round(longWins/longSignals*100):0,
+    longCount:longSignals,
+    shortWinRate:shortSignals>0?Math.round(shortWins/shortSignals*100):0,
+    shortCount:shortSignals,
+  };
+}
 
-  // 눌림목 감지 (롱)
-  const recent=candles.slice(-10);
-  const startPrice=recent[0].close;
-  const lowestRecent=Math.min(...recent.map(c=>c.low));
-  const dropPct=(lowestRecent-startPrice)/startPrice*100;
-  const lastCandle=candles[candles.length-1];
-  const isGreen=lastCandle.close>lastCandle.open;
-  const isRed=lastCandle.close<lastCandle.open;
-  const avgVol=recent.slice(0,-1).reduce((s,c)=>s+(c.volume||0),0)/9;
-  const lastVol=lastCandle.volume||0;
-  const volSpike=avgVol>0&&lastVol>avgVol*1.5;
+// ── 100점 점수 시스템 ──
+function calcSignal100(data5m,data15m,data1h,data1d){
+  if(!data5m||data5m.length<60)return null;
+  const closes5=data5m.map(c=>c.close);
+  const closes1h=data1h?data1h.map(c=>c.close):[];
+  const price=closes5[closes5.length-1];
 
-  // 반등목 감지 (롱): 하락 후 양봉+볼륨 증가
-  const pullbackLong=dropPct<-0.15&&isGreen&&volSpike&&lastCandle.close>(lastCandle.high+lastCandle.low)/2;
-  // 반등목 감지 (숏): 상승 후 음봉+볼륨 증가
-  const peakRecent=Math.max(...recent.map(c=>c.high));
-  const risePct=(peakRecent-startPrice)/startPrice*100;
-  const pullbackShort=risePct>0.15&&isRed&&volSpike&&lastCandle.close<(lastCandle.high+lastCandle.low)/2;
+  // 지표 계산
+  const adx5=adx(data5m,14);
+  const adx15=data15m?adx(data15m,14):null;
+  const adx1h=data1h?adx(data1h,14):null;
+  const r5=rsi(closes5,14);
+  const lastRSI=r5?r5[r5.length-1]:50;
+  const prevRSI=r5?r5[r5.length-2]:50;
+  const st1=stoch(data5m,5,3,3);
+  const st2=stoch(data5m,14,3,3);
+  const st3=stoch(data5m,21,7,7);
+  const m=macd(closes5);
+  const ema20_1h=data1h?ema(closes1h,20):null;
+  const ema60_1h=data1h&&closes1h.length>=60?ema(closes1h,60):null;
+  const ema200_1h=data1h&&closes1h.length>=200?ema(closes1h,200):null;
+  const elliott=data1h?elliottFib(data1h):null;
+  const vp=data1h?volumeProfile(data1h):null;
+  const pdh=data1d?prevDayHL(data1d):null;
+  const bt=backtest(data5m);
 
-  // ── 롱 점수 ──
-  const longChecks=[];
+  // ── 차단 필터 ──
+  const adx1hVal=adx1h?adx1h.lastADX:0;
+  const sideways=adx1hVal<20;
+
+  // ── 트리플 크로스 감지 ──
+  const detectCross=(s)=>{
+    if(!s||s.k.length<4)return null;
+    const recent=Math.min(3,s.k.length-1);
+    for(let i=s.k.length-recent;i<s.k.length;i++){
+      const cur=s.k[i]-s.d[i],prev=s.k[i-1]-s.d[i-1];
+      if(cur>0&&prev<=0)return {type:'golden',kVal:s.k[i]};
+      if(cur<0&&prev>=0)return {type:'dead',kVal:s.k[i]};
+    }
+    return null;
+  };
+  const cr1=detectCross(st1),cr2=detectCross(st2),cr3=detectCross(st3);
+  const tripleGolden=cr1?.type==='golden'&&cr2?.type==='golden'&&cr3?.type==='golden';
+  const tripleDead=cr1?.type==='dead'&&cr2?.type==='dead'&&cr3?.type==='dead';
+  const tripleGoldenLow=tripleGolden&&(cr1.kVal<30||cr2.kVal<30);
+  const tripleDeadHigh=tripleDead&&(cr1.kVal>70||cr2.kVal>70);
+
+  // ════════════════════════
+  // 롱 점수 계산
+  // ════════════════════════
   let longScore=0;
-  const addL=(label,val,pts,ok)=>{longChecks.push({label,val,pts,ok});if(ok)longScore+=pts;};
+  const longBreakdown={dmi:0,ema:0,stoch:0,rsi:0,macd:0};
+  const longChecks=[];
 
-  // 1. Stoch(5) 골든크로스 + 20↓
-  const st1GoldL=st1&&st1.lastK>st1.lastD&&st1.prevK<=st1.prevD&&st1.lastK<35;
-  addL('Stoch(5) 골든+과매도',st1?(st1.lastK.toFixed(0)+'/'+st1.lastD.toFixed(0)):'--',3,st1GoldL);
-  // 2. Stoch(14) 50↓ 상승
-  const st2RisL=st2&&st2.lastK<55&&st2.lastK>st2.prevK;
-  addL('Stoch(14) 50↓상승',st2?st2.lastK.toFixed(0):'--',2,st2RisL);
-  // 3. Stoch(21) 80↓
-  const st3OkL=st3&&st3.lastK<80;
-  addL('Stoch(21) 80↓',st3?st3.lastK.toFixed(0):'--',1,st3OkL);
-  // 4. RSI 회복
-  const rsiOkL=lastRSI&&lastRSI>=30&&lastRSI<=58&&lastRSI>prevRSI;
-  addL('RSI 30~58 상승',lastRSI?lastRSI.toFixed(1):'--',2,rsiOkL);
-  // 5. MACD 골든 or 히스토그램 양전환
-  const macdOkL=m&&(m.lastMacd>m.lastSig||(m.lastHist>0&&m.prevHist<=0));
-  addL('MACD 골든/양전환',m?m.lastHist.toFixed(3):'--',2,macdOkL);
-  // 6. ADX > 20 + +DI > -DI
-  const adxOkL=ax&&ax.lastADX>20&&ax.lastPlus>ax.lastMinus;
-  addL('ADX>20 +DI>-DI',ax?ax.lastADX.toFixed(0):'--',2,adxOkL);
-  // 7. VWAP 위 + 기울기 ↑
-  const vwapOkL=vw&&price>vw.last.vwap&&vw.slope>0.02;
-  addL('VWAP 위 + 기울기↑',vw?'$'+fu(vw.last.vwap):'--',2,vwapOkL);
-  // 8. EMA 정배열 (price>20>60)
-  const emaOkL=e20&&e60&&price>e20&&e20>e60;
-  addL('EMA 정배열',e20?'E20↑':'--',2,emaOkL);
-  // 9. 눌림목 후 반등
-  addL('눌림목→반등',pullbackLong?'★':'--',3,pullbackLong);
+  // A. DMI/ADX (25점) - 멀티TF
+  const dmiL=multiADXScore(adx5,adx15,adx1h,1);
+  longBreakdown.dmi=dmiL.score;
+  longScore+=dmiL.score;
+  longChecks.push({lbl:'DMI/ADX 멀티TF',val:`${dmiL.score}/25`,ok:dmiL.score>=15});
 
-  // ── 숏 점수 ──
-  const shortChecks=[];
+  // B. 1H EMA 지지 (15점)
+  let emaScore=0;
+  if(ema20_1h){
+    const dist=(price-ema20_1h)/ema20_1h*100;
+    if(price>ema20_1h&&Math.abs(dist)<0.5)emaScore+=10;
+    else if(price>ema20_1h)emaScore+=5;
+  }
+  if(ema60_1h&&ema20_1h&&ema20_1h>ema60_1h)emaScore+=3;
+  if(ema200_1h&&price>ema200_1h)emaScore+=2;
+  longBreakdown.ema=emaScore;
+  longScore+=emaScore;
+  longChecks.push({lbl:'1H EMA 지지',val:`${emaScore}/15`,ok:emaScore>=8});
+
+  // C. 5M 스토 과매도/크로스 (30점)
+  let stochScore=0;
+  if(tripleGoldenLow)stochScore+=20;
+  else if(tripleGolden)stochScore+=13;
+  if(st1&&st1.lastK<20)stochScore+=8;
+  else if(st1&&st1.lastK<30)stochScore+=5;
+  if(st2&&st2.lastK<25)stochScore+=4;
+  if(st3&&st3.lastK<30)stochScore+=2;
+  stochScore=Math.min(stochScore,30);
+  longBreakdown.stoch=stochScore;
+  longScore+=stochScore;
+  longChecks.push({lbl:'스토 과매도/골든',val:`${stochScore}/30`,ok:stochScore>=15});
+
+  // D. 5M RSI 과매도 (20점)
+  let rsiScore=0;
+  if(lastRSI<25)rsiScore=20;
+  else if(lastRSI<30)rsiScore=16;
+  else if(lastRSI<40)rsiScore=10;
+  else if(lastRSI<50&&lastRSI>prevRSI)rsiScore=4;
+  if(lastRSI>70)rsiScore=-12;
+  if(lastRSI>80)rsiScore=-20;
+  longBreakdown.rsi=rsiScore;
+  longScore+=rsiScore;
+  longChecks.push({lbl:'RSI '+lastRSI.toFixed(1),val:`${rsiScore}/20`,ok:rsiScore>=8});
+
+  // E. MACD (10점)
+  let macdScore=0;
+  if(m){
+    if(m.lastMacd>m.lastSig&&m.prevHist<=0&&m.lastHist>0)macdScore+=7;
+    else if(m.lastHist>0&&m.prevHist<=0)macdScore+=5;
+    else if(m.lastHist>0&&m.lastHist>m.prevHist)macdScore+=3;
+  }
+  longBreakdown.macd=macdScore;
+  longScore+=macdScore;
+  longChecks.push({lbl:'MACD',val:`${macdScore}/10`,ok:macdScore>=3});
+
+  // 차단 조건
+  let longBlocked=false;
+  if(sideways){longBlocked=true;longScore=0;}
+  if(adx1h&&adx1h.lastMinus>adx1h.lastPlus){longBlocked=true;longScore=Math.min(longScore,30);}
+
+  // ════════════════════════
+  // 숏 점수 계산
+  // ════════════════════════
   let shortScore=0;
-  const addS=(label,val,pts,ok)=>{shortChecks.push({label,val,pts,ok});if(ok)shortScore+=pts;};
-  const st1DeadS=st1&&st1.lastK<st1.lastD&&st1.prevK>=st1.prevD&&st1.lastK>65;
-  addS('Stoch(5) 데드+과매수',st1?(st1.lastK.toFixed(0)+'/'+st1.lastD.toFixed(0)):'--',3,st1DeadS);
-  const st2FalS=st2&&st2.lastK>45&&st2.lastK<st2.prevK;
-  addS('Stoch(14) 50↑하락',st2?st2.lastK.toFixed(0):'--',2,st2FalS);
-  const st3OkS=st3&&st3.lastK>20;
-  addS('Stoch(21) 20↑',st3?st3.lastK.toFixed(0):'--',1,st3OkS);
-  const rsiOkS=lastRSI&&lastRSI>=42&&lastRSI<=70&&lastRSI<prevRSI;
-  addS('RSI 42~70 하락',lastRSI?lastRSI.toFixed(1):'--',2,rsiOkS);
-  const macdOkS=m&&(m.lastMacd<m.lastSig||(m.lastHist<0&&m.prevHist>=0));
-  addS('MACD 데드/음전환',m?m.lastHist.toFixed(3):'--',2,macdOkS);
-  const adxOkS=ax&&ax.lastADX>20&&ax.lastMinus>ax.lastPlus;
-  addS('ADX>20 -DI>+DI',ax?ax.lastADX.toFixed(0):'--',2,adxOkS);
-  const vwapOkS=vw&&price<vw.last.vwap&&vw.slope<-0.02;
-  addS('VWAP 아래 + 기울기↓',vw?'$'+fu(vw.last.vwap):'--',2,vwapOkS);
-  const emaOkS=e20&&e60&&price<e20&&e20<e60;
-  addS('EMA 역배열',e20?'E20↓':'--',2,emaOkS);
-  addS('반등→하락',pullbackShort?'★':'--',3,pullbackShort);
+  const shortBreakdown={dmi:0,ema:0,stoch:0,rsi:0,macd:0};
+  const shortChecks=[];
 
-  // 결정
-  let score=0,dir='wait',checks=[];
-  if(longScore>shortScore){score=longScore;dir='long';checks=longChecks;}
-  else if(shortScore>longScore){score=shortScore;dir='short';checks=shortChecks;}
-  else{score=longScore;dir='wait';checks=longChecks;}
+  // A. DMI/ADX (25점)
+  const dmiS=multiADXScore(adx5,adx15,adx1h,-1);
+  shortBreakdown.dmi=dmiS.score;
+  shortScore+=dmiS.score;
+  shortChecks.push({lbl:'DMI/ADX 멀티TF',val:`${dmiS.score}/25`,ok:dmiS.score>=15});
+
+  // B. 1H EMA 저항 (15점)
+  let emaScoreS=0;
+  if(ema20_1h){
+    const dist=(ema20_1h-price)/ema20_1h*100;
+    if(price<ema20_1h&&Math.abs(dist)<0.5)emaScoreS+=10;
+    else if(price<ema20_1h)emaScoreS+=5;
+  }
+  if(ema60_1h&&ema20_1h&&ema20_1h<ema60_1h)emaScoreS+=3;
+  if(ema200_1h&&price<ema200_1h)emaScoreS+=2;
+  shortBreakdown.ema=emaScoreS;
+  shortScore+=emaScoreS;
+  shortChecks.push({lbl:'1H EMA 저항',val:`${emaScoreS}/15`,ok:emaScoreS>=8});
+
+  // C. 5M 스토 과매수/데드 (30점)
+  let stochScoreS=0;
+  if(tripleDeadHigh)stochScoreS+=20;
+  else if(tripleDead)stochScoreS+=13;
+  if(st1&&st1.lastK>80)stochScoreS+=8;
+  else if(st1&&st1.lastK>70)stochScoreS+=5;
+  if(st2&&st2.lastK>75)stochScoreS+=4;
+  if(st3&&st3.lastK>70)stochScoreS+=2;
+  stochScoreS=Math.min(stochScoreS,30);
+  shortBreakdown.stoch=stochScoreS;
+  shortScore+=stochScoreS;
+  shortChecks.push({lbl:'스토 과매수/데드',val:`${stochScoreS}/30`,ok:stochScoreS>=15});
+
+  // D. 5M RSI 과매수 (20점)
+  let rsiScoreS=0;
+  if(lastRSI>75)rsiScoreS=20;
+  else if(lastRSI>70)rsiScoreS=16;
+  else if(lastRSI>60)rsiScoreS=10;
+  else if(lastRSI>50&&lastRSI<prevRSI)rsiScoreS=4;
+  if(lastRSI<30)rsiScoreS=-12;
+  if(lastRSI<20)rsiScoreS=-20;
+  shortBreakdown.rsi=rsiScoreS;
+  shortScore+=rsiScoreS;
+  shortChecks.push({lbl:'RSI '+lastRSI.toFixed(1),val:`${rsiScoreS}/20`,ok:rsiScoreS>=8});
+
+  // E. MACD (10점)
+  let macdScoreS=0;
+  if(m){
+    if(m.lastMacd<m.lastSig&&m.prevHist>=0&&m.lastHist<0)macdScoreS+=7;
+    else if(m.lastHist<0&&m.prevHist>=0)macdScoreS+=5;
+    else if(m.lastHist<0&&m.lastHist<m.prevHist)macdScoreS+=3;
+  }
+  shortBreakdown.macd=macdScoreS;
+  shortScore+=macdScoreS;
+  shortChecks.push({lbl:'MACD',val:`${macdScoreS}/10`,ok:macdScoreS>=3});
+
+  // 차단
+  let shortBlocked=false;
+  if(sideways){shortBlocked=true;shortScore=0;}
+  if(adx1h&&adx1h.lastPlus>adx1h.lastMinus){shortBlocked=true;shortScore=Math.min(shortScore,30);}
+
+  longScore=Math.max(0,Math.min(100,Math.round(longScore)));
+  shortScore=Math.max(0,Math.min(100,Math.round(shortScore)));
+
+  // 최종 방향
+  const diff=Math.abs(longScore-shortScore);
+  const dir=diff<10?'wait':longScore>shortScore?'long':'short';
+  const score=Math.max(longScore,shortScore);
+  const checks=dir==='short'?shortChecks:longChecks;
+  const breakdown=dir==='short'?shortBreakdown:longBreakdown;
 
   // 진입 플랜
   const plan={
@@ -602,8 +867,25 @@ function calcSignal(candles){
     sl:dir==='long'?price*0.9988:dir==='short'?price*1.0012:price,
     rr:'1:1.25',
   };
-  return {score,dir,checks,plan,
-    indicators:{rsi:r,macd:m,adx:ax,st1,st2,st3,vw,e20,e60,e200}};
+
+  return {
+    score,dir,checks,plan,
+    longScore,shortScore,longBreakdown,shortBreakdown,
+    longBlocked,shortBlocked,sideways,
+    tripleGolden,tripleDead,tripleGoldenLow,tripleDeadHigh,
+    indicators:{
+      rsi:r5,macd:m,adx:adx5,adx15,adx1h,st1,st2,st3,
+      ema20_1h,ema60_1h,ema200_1h,
+      elliott,vp,pdh,
+      vw:vwapSession(data5m),
+    },
+    backtest:bt,
+  };
+}
+
+// 기존 calcSignal은 호환성 유지
+function calcSignal(candles){
+  return calcSignal100(candles,null,null,null);
 }
 
 // ═══════════════════════════════════════════════
@@ -787,22 +1069,62 @@ async function loadKlines(symbol,tf,limit=500){
 }
 
 async function refreshAll(){
-  const candles=await loadKlines(S.coin,S.tf,500);
-  if(!candles.length)return;
-  S.candles[S.coin+'_'+S.tf]=candles;
-  drawMain(candles);
-  computeAndRender(candles);
-  // 미니 차트 (1h, 15m)
-  loadMiniChart('mini-1h','1h',200);
-  loadMiniChart('mini-15m','15m',200);
+  // 메인 5분, 보조 15분/1시간/일봉 동시 로드
+  const [c5,c15,c1h,c1d]=await Promise.all([
+    loadKlines(S.coin,S.tf,500),
+    loadKlines(S.coin,'15m',300),
+    loadKlines(S.coin,'1h',300),
+    loadKlines(S.coin,'1d',60),
+  ]);
+  if(!c5.length)return;
+  S.candles[S.coin+'_'+S.tf]=c5;
+  S.candles[S.coin+'_15m']=c15;
+  S.candles[S.coin+'_1h']=c1h;
+  S.candles[S.coin+'_1d']=c1d;
+  drawMain(c5);
+  computeAndRender(c5);
+  // 미니 차트 (1h, 15m) — 이미 로드된 데이터 사용
+  drawMiniChart('mini-1h',c1h,'1h',c1d);
+  drawMiniChart('mini-15m',c15,'15m',c1d);
 }
 
-async function loadMiniChart(id,tf,limit){
+function drawMiniChart(id,candles,tf,candles1d){
   try{
-    const candles=await loadKlines(S.coin,tf,limit);
-    if(!candles.length)return;
+    if(!candles||!candles.length)return;
     const cs=S.series[id+'_candle'];
     if(cs)cs.setData(candles);
+
+    // VWAP 흰색 선
+    const vw=vwapSession(candles);
+    if(vw&&vw.series.length){
+      if(S.series[id+'_vwap'])try{S.charts[id].removeSeries(S.series[id+'_vwap']);}catch(e){}
+      const v=S.charts[id].addLineSeries({color:'#ffffff',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+      v.setData(vw.series.map(d=>({time:d.time,value:d.vwap})));
+      S.series[id+'_vwap']=v;
+    }
+
+    // 전일 고저 얇은 점선
+    if(candles1d&&candles1d.length>=2){
+      const pd=prevDayHL(candles1d);
+      if(pd){
+        if(S.series[id+'_pdh'])try{cs.removePriceLine(S.series[id+'_pdh']);}catch(e){}
+        if(S.series[id+'_pdl'])try{cs.removePriceLine(S.series[id+'_pdl']);}catch(e){}
+        S.series[id+'_pdh']=cs.createPriceLine({price:pd.high,color:'rgba(255,75,110,0.55)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+        S.series[id+'_pdl']=cs.createPriceLine({price:pd.low,color:'rgba(15,214,111,0.55)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+      }
+    }
+
+    // 매물대 POC (반투명 가로선)
+    const vp=volumeProfile(candles);
+    if(vp){
+      if(S.series[id+'_poc'])try{cs.removePriceLine(S.series[id+'_poc']);}catch(e){}
+      if(S.series[id+'_vah'])try{cs.removePriceLine(S.series[id+'_vah']);}catch(e){}
+      if(S.series[id+'_val'])try{cs.removePriceLine(S.series[id+'_val']);}catch(e){}
+      S.series[id+'_poc']=cs.createPriceLine({price:vp.poc,color:'rgba(255,167,38,0.7)',lineWidth:2,lineStyle:LightweightCharts.LineStyle.Solid,axisLabelVisible:false,title:''});
+      S.series[id+'_vah']=cs.createPriceLine({price:vp.vah,color:'rgba(255,167,38,0.35)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+      S.series[id+'_val']=cs.createPriceLine({price:vp.val,color:'rgba(255,167,38,0.35)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+    }
+
     // RSI
     const rsiKey=id+'-rsi';
     const closes=candles.map(c=>c.close);
@@ -811,7 +1133,6 @@ async function loadMiniChart(id,tf,limit){
       const off=candles.length-rsiArr.length;
       const data=rsiArr.map((v,i)=>({time:candles[i+off].time,value:v}));
       S.series[rsiKey].setData(data);
-      // 기준선
       if(data.length){
         const t0=data[0].time,tN=data[data.length-1].time;
         S.series[rsiKey+'_refHi'].setData([{time:t0,value:70},{time:tN,value:70}]);
@@ -927,13 +1248,17 @@ function applyStochBackground(type){
 // ═══════════════════════════════════════════════
 function computeAndRender(candles){
   if(!candles||candles.length<60)return;
-  const sig=calcSignal(candles);
+  const c15=S.candles[S.coin+'_15m'];
+  const c1h=S.candles[S.coin+'_1h'];
+  const c1d=S.candles[S.coin+'_1d'];
+  const sig=calcSignal100(candles,c15,c1h,c1d);
+  if(!sig)return;
   const price=candles[candles.length-1].close;
 
   // 헤더
   document.getElementById('h-price').textContent='$'+fu(price);
   if(sig.indicators.vw)document.getElementById('h-vwap').textContent='$'+fu(sig.indicators.vw.last.vwap);
-  if(sig.indicators.adx)document.getElementById('h-adx').textContent=sig.indicators.adx.lastADX.toFixed(0);
+  if(sig.indicators.adx1h)document.getElementById('h-adx').textContent=sig.indicators.adx1h.lastADX.toFixed(0)+' (1H)';
 
   // 신호 빅 배너
   const arrowEl=document.getElementById('sig-arrow');
@@ -942,8 +1267,12 @@ function computeAndRender(candles){
   scoreEl.textContent=sig.score;
   arrowEl.className='sig-arrow '+(sig.dir==='long'?'long':sig.dir==='short'?'short':'wait');
   arrowEl.textContent=sig.dir==='long'?'▲':sig.dir==='short'?'▼':'──';
-  dirEl.textContent=sig.dir==='long'?'롱':sig.dir==='short'?'숏':'대기';
-  scoreEl.className='sig-score '+(sig.score>=15?'s15':sig.score>=12?'s12':sig.score>=8?'s8':'s0');
+  dirEl.textContent=sig.dir==='long'?'롱':sig.dir==='short'?'숏':sig.sideways?'⚠ 횡보':'대기';
+  scoreEl.className='sig-score '+(sig.score>=85?'s15':sig.score>=70?'s12':sig.score>=55?'s8':'s0');
+
+  // 점수 라벨 변경: /20점 → /100점
+  const lblEl=document.querySelector('.sig-score-lbl');
+  if(lblEl)lblEl.textContent='/ 100 점';
 
   // 진입 플랜
   document.getElementById('pl-entry').textContent='$'+fu(sig.plan.entry);
@@ -954,18 +1283,73 @@ function computeAndRender(candles){
   // 배너 깜빡임
   const banner=document.getElementById('signal-banner');
   banner.className='';
-  if(sig.score>=12){
+  if(sig.score>=70){
     if(sig.dir==='long')banner.className='flash-long';
     else if(sig.dir==='short')banner.className='flash-short';
   }
 
-  // 조건 그리드
+  // 조건 그리드 (롱/숏 점수 분리 표시 + 백테스트)
   const grid=document.getElementById('cond-grid');
   grid.innerHTML='';
-  sig.checks.forEach(c=>{
+
+  // 상단: 롱/숏 점수 박스
+  const headerHtml=`
+    <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+      <div style="padding:8px;background:rgba(15,214,111,${sig.longScore>=55?0.2:0.08});border:1px solid rgba(15,214,111,${sig.longScore>=55?0.5:0.2});border-radius:4px;text-align:center;">
+        <div style="font-size:10px;color:var(--tx2);font-weight:700;">롱 점수</div>
+        <div style="font-size:22px;font-weight:900;color:var(--gn);">${sig.longScore}</div>
+        ${sig.backtest&&sig.backtest.longCount>0?`<div style="font-size:10px;color:var(--tx2);">백테 ${sig.backtest.longWinRate}% (${sig.backtest.longCount}회)</div>`:'<div style="font-size:9px;color:var(--tx3);">백테 N/A</div>'}
+        ${sig.longBlocked?'<div style="font-size:9px;color:var(--rd);font-weight:700;">⚠ 차단</div>':''}
+      </div>
+      <div style="padding:8px;background:rgba(255,75,110,${sig.shortScore>=55?0.2:0.08});border:1px solid rgba(255,75,110,${sig.shortScore>=55?0.5:0.2});border-radius:4px;text-align:center;">
+        <div style="font-size:10px;color:var(--tx2);font-weight:700;">숏 점수</div>
+        <div style="font-size:22px;font-weight:900;color:var(--rd);">${sig.shortScore}</div>
+        ${sig.backtest&&sig.backtest.shortCount>0?`<div style="font-size:10px;color:var(--tx2);">백테 ${sig.backtest.shortWinRate}% (${sig.backtest.shortCount}회)</div>`:'<div style="font-size:9px;color:var(--tx3);">백테 N/A</div>'}
+        ${sig.shortBlocked?'<div style="font-size:9px;color:var(--rd);font-weight:700;">⚠ 차단</div>':''}
+      </div>
+    </div>`;
+
+  // 점수 분해 (breakdown)
+  const bd=sig.dir==='short'?sig.shortBreakdown:sig.longBreakdown;
+  const bdHtml=`
+    <div style="grid-column:1/-1;background:var(--bg3);border:1px solid var(--bd);border-radius:4px;padding:6px;margin-bottom:6px;font-size:11px;">
+      <div style="color:var(--gd);font-weight:700;margin-bottom:4px;font-size:10px;">${sig.dir==='short'?'숏':'롱'} 점수 분해</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;">
+        <div>DMI/ADX: <b>${bd.dmi}/25</b></div>
+        <div>1H EMA: <b>${bd.ema}/15</b></div>
+        <div>스토: <b>${bd.stoch}/30</b></div>
+        <div>RSI: <b>${bd.rsi}/20</b></div>
+        <div style="grid-column:1/-1;">MACD: <b>${bd.macd}/10</b></div>
+      </div>
+    </div>`;
+
+  // 엘리엇/피보
+  let elHtml='';
+  if(sig.indicators.elliott){
+    const e=sig.indicators.elliott;
+    const lv=e.levels;
+    elHtml=`<div style="grid-column:1/-1;background:var(--bg3);border:1px solid var(--bd);border-radius:4px;padding:6px;margin-bottom:6px;font-size:11px;">
+      <div style="color:var(--gd);font-weight:700;margin-bottom:4px;font-size:10px;">엘리엇 파동 추정 · 피보나치 (1H)</div>
+      <div>${e.waveLabel} · 방향: ${e.isUp?'▲ 상승':'▼ 하락'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-top:4px;font-size:10px;">
+        <div style="color:var(--tx2);">0.236: <b style="color:var(--tx)">$${fu(lv[0.236])}</b></div>
+        <div style="color:var(--tx2);">0.382: <b style="color:var(--tx)">$${fu(lv[0.382])}</b></div>
+        <div style="color:var(--gn);">0.618: <b>$${fu(lv[0.618])}</b></div>
+        <div style="color:var(--gd);">0.786: <b>$${fu(lv[0.786])}</b></div>
+        <div style="color:var(--tx2);">1.272: <b style="color:var(--tx)">$${fu(lv[1.272])}</b></div>
+        <div style="color:var(--tx2);">1.618: <b style="color:var(--tx)">$${fu(lv[1.618])}</b></div>
+      </div>
+    </div>`;
+  }
+
+  grid.innerHTML=headerHtml+bdHtml+elHtml;
+
+  // 조건 체크 리스트
+  const checks=sig.dir==='short'?sig.checks:sig.checks;
+  checks.forEach(c=>{
     const d=document.createElement('div');
     d.className='cond-item'+(c.ok?' ok':'');
-    d.innerHTML=`<span class="cond-label">${c.ok?'●':'○'} ${c.label}</span><span class="cv">${c.val||''}</span>`;
+    d.innerHTML=`<span class="cond-label">${c.ok?'●':'○'} ${c.lbl}</span><span class="cv">${c.val||''}</span>`;
     grid.appendChild(d);
   });
 
@@ -980,12 +1364,11 @@ function computeAndRender(candles){
   // 차트에 지표 그리기
   drawIndicators(sig,candles);
 
-  // 알림 발사
-  if(sig.score>=8&&sig.dir!=='wait'&&(sig.dir!==S.lastDir||sig.score>S.lastScore+2)){
+  // 알림 발사 (70점 기준)
+  if(sig.score>=70&&sig.dir!=='wait'&&(sig.dir!==S.lastDir||sig.score>S.lastScore+5)){
     addAlert(sig.score,sig.dir,sig.plan.entry);
-    if(sig.score>=15){playBeep(1200,400);vibrate([200,100,200,100,200]);}
-    else if(sig.score>=12){playBeep(1000,250);vibrate([150,80,150]);}
-    else{playBeep(800,150);vibrate(100);}
+    if(sig.score>=85){playBeep(1200,400);}
+    else if(sig.score>=70){playBeep(1000,250);}
   }
   S.lastScore=sig.score;
   S.lastDir=sig.dir;
