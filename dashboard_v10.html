@@ -362,13 +362,22 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
       <div style="position:absolute;inset:0;" id="cL"></div>
     </div>
     <!-- RSI -->
-    <div style="height:55px;flex-shrink:0;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+    <div style="height:50px;flex-shrink:0;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
       <div style="height:16px;flex-shrink:0;background:#f5f5f5;border-bottom:1px solid #e0e0e0;padding:1px 8px;display:flex;align-items:center;gap:5px;">
         <span style="font-size:9px;font-weight:700;color:#7048e8">RSI(14)</span>
         <span id="rsiL-v" style="font-size:9px;font-weight:700;color:#7048e8">--</span>
         <span style="font-size:8px;color:#999;margin-left:auto">30↓ 70↑</span>
       </div>
       <div style="flex:1;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;" id="cL-rsi"></div></div>
+    </div>
+    <!-- Stochastic -->
+    <div style="height:50px;flex-shrink:0;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+      <div style="height:16px;flex-shrink:0;background:#f5f5f5;border-bottom:1px solid #e0e0e0;padding:1px 8px;display:flex;align-items:center;gap:5px;">
+        <span style="font-size:9px;font-weight:700;color:#5c7a29">STOCH(14,3)</span>
+        <span id="stochL-v" style="font-size:9px;font-weight:700;color:#5c7a29">--</span>
+        <span style="font-size:8px;color:#999;margin-left:auto">20↓ 80↑</span>
+      </div>
+      <div style="flex:1;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;" id="cL-stoch"></div></div>
     </div>
   </div>
 
@@ -389,7 +398,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
     <div style="flex:1;position:relative;background:#fff;border:1px solid #e0e0e0;border-radius:4px;overflow:hidden;min-height:0;">
       <div style="position:absolute;inset:0;" id="cR"></div>
     </div>
-    <div style="height:55px;flex-shrink:0;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+    <div style="height:50px;flex-shrink:0;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
       <div style="height:16px;flex-shrink:0;background:#f5f5f5;border-bottom:1px solid #e0e0e0;padding:1px 8px;display:flex;align-items:center;gap:5px;">
         <span style="font-size:9px;font-weight:700;color:#7048e8">RSI(14)</span>
         <span id="rsiR-v" style="font-size:9px;font-weight:700;color:#7048e8">--</span>
@@ -397,13 +406,22 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
       </div>
       <div style="flex:1;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;" id="cR-rsi"></div></div>
     </div>
+    <!-- Stochastic -->
+    <div style="height:50px;flex-shrink:0;background:#fff;border:1px solid #e0e0e0;border-radius:4px;display:flex;flex-direction:column;">
+      <div style="height:16px;flex-shrink:0;background:#f5f5f5;border-bottom:1px solid #e0e0e0;padding:1px 8px;display:flex;align-items:center;gap:5px;">
+        <span style="font-size:9px;font-weight:700;color:#5c7a29">STOCH(14,3)</span>
+        <span id="stochR-v" style="font-size:9px;font-weight:700;color:#5c7a29">--</span>
+        <span style="font-size:8px;color:#999;margin-left:auto">20↓ 80↑</span>
+      </div>
+      <div style="flex:1;position:relative;overflow:hidden;"><div style="position:absolute;inset:0;" id="cR-stoch"></div></div>
+    </div>
   </div>
 
 </div>
 
 <!-- 기존 멀티 차트 뷰 (별도 탭) -->
-<div id="view-multi" style="display:none;flex:1;gap:2px;padding:2px;overflow:hidden;min-height:0;">
-<div id="ca" style="display:grid;grid-template-columns:1fr 1fr;gap:2px;flex:1;min-width:0;overflow:hidden;min-height:0;width:100%;height:100%;">
+<div id="view-multi" style="display:none;flex:1;gap:2px;padding:2px;overflow:hidden;min-height:0;width:100%;height:100%;">
+<div id="ca" style="display:grid;grid-template-columns:1fr 1fr;gap:2px;width:100%;height:100%;min-height:0;overflow:hidden;">
 
   <!-- 좌: 3분+RSI+15분+RSI -->
   <div style="display:flex;flex-direction:column;gap:2px;overflow:hidden;min-height:0;">
@@ -784,22 +802,52 @@ function initCharts(){
     new ResizeObserver(en=>{for(let e of en)c.resize(e.contentRect.width,e.contentRect.height);}).observe(el);
   });
 
+  // 듀얼 Stochastic 차트
+  ['cL-stoch','cR-stoch'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    const c=LightweightCharts.createChart(el,{...IND_OPT,width:el.offsetWidth,height:el.offsetHeight});
+    const sk=c.addLineSeries({color:'#1a5fb4',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});
+    const sd=c.addLineSeries({color:'#c0392b',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+    const hi=c.addLineSeries({color:'rgba(192,57,43,0.35)',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+    const lo=c.addLineSeries({color:'rgba(10,122,106,0.35)',lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+    S.charts[id]=c;
+    S.indSeries[id+'_k']=sk;S.indSeries[id+'_d']=sd;
+    S.indSeries[id+'_hi']=hi;S.indSeries[id+'_lo']=lo;
+    new ResizeObserver(en=>{for(let e of en)c.resize(e.contentRect.width,e.contentRect.height);}).observe(el);
+  });
+
   S.dualTF={L:'3m',R:'1h'};
 }
 
 // ── 듀얼 차트 뷰 전환 ──
 function switchChartView(view){
-  document.getElementById('view-dual').style.display=view==='dual'?'flex':'none';
-  document.getElementById('view-multi').style.display=view==='multi'?'flex':'none';
+  const dual=document.getElementById('view-dual');
+  const multi=document.getElementById('view-multi');
+  const ca=document.getElementById('ca');
+  if(view==='dual'){
+    dual.style.display='flex';
+    multi.style.display='none';
+  } else {
+    dual.style.display='none';
+    multi.style.display='flex';
+    if(ca)ca.style.display='grid';
+  }
   document.getElementById('tab-dual').classList.toggle('active',view==='dual');
   document.getElementById('tab-multi').classList.toggle('active',view==='multi');
-  // 리사이즈 트리거
+  // 리사이즈 트리거 - 약간 딜레이 후 모든 차트 강제 리사이즈
   setTimeout(()=>{
     Object.keys(S.charts).forEach(k=>{
       const el=document.getElementById(k);
-      if(el&&S.charts[k])S.charts[k].resize(el.offsetWidth,el.offsetHeight);
+      if(el&&S.charts[k]){
+        const w=el.offsetWidth,h=el.offsetHeight;
+        if(w>0&&h>0)S.charts[k].resize(w,h);
+      }
     });
-  },50);
+    // scrollToRealTime 다시 호출
+    Object.keys(S.charts).forEach(k=>{
+      try{S.charts[k].timeScale().scrollToRealTime();}catch(e){}
+    });
+  },100);
 }
 
 // ── 듀얼 차트 TF 변경 ──
@@ -907,28 +955,71 @@ function drawDualIndicators(chartId,data){
   }catch(e){}
 }
 
-// ── 듀얼 RSI 그리기 ──
+// ── 듀얼 RSI + Stochastic 그리기 ──
 function drawDualRSI(chartId,data){
   const rsiChartId=chartId+'-rsi';
-  const rsiChart=S.charts[rsiChartId];
   const rsiSer=S.indSeries[rsiChartId];
-  if(!rsiChart||!rsiSer||!data)return;
+  if(!rsiSer||!data)return;
   const closes=data.map(c=>c.close);
   const r=rsiCalc(closes,14);
   if(!r.length)return;
   const off=data.length-r.length;
   rsiSer.setData(r.map((v,i)=>({time:data[i+off].time,value:v})));
-  // 기준선
   if(data.length){
     const t0=data[off].time,tN=data[data.length-1].time;
     S.indSeries[rsiChartId+'_hi'].setData([{time:t0,value:70},{time:tN,value:70}]);
     S.indSeries[rsiChartId+'_lo'].setData([{time:t0,value:30},{time:tN,value:30}]);
   }
-  // 값 표시
   const last=r[r.length-1];
   const side=chartId==='cL'?'L':'R';
   const el=document.getElementById('rsi'+side+'-v');
   if(el){el.textContent=last.toFixed(1);el.style.color=last>70?'#c0392b':last<30?'#0a7a6a':'#7048e8';}
+
+  // Stochastic (14,3,3)
+  try{
+    const stochId=chartId+'-stoch';
+    const sk=S.indSeries[stochId+'_k'];
+    const sd=S.indSeries[stochId+'_d'];
+    if(!sk||!sd)return;
+    const st=stochCalc(data,14,3);
+    if(!st||!st.k.length)return;
+    const offSt=data.length-st.k.length;
+    sk.setData(st.k.map((v,i)=>({time:data[i+offSt].time,value:v})));
+    const offD=data.length-st.d.length;
+    sd.setData(st.d.map((v,i)=>({time:data[i+offD].time,value:v})));
+    if(st.k.length){
+      const t0=data[offSt].time,tN=data[data.length-1].time;
+      S.indSeries[stochId+'_hi'].setData([{time:t0,value:80},{time:tN,value:80}]);
+      S.indSeries[stochId+'_lo'].setData([{time:t0,value:20},{time:tN,value:20}]);
+    }
+    const lastK=st.k[st.k.length-1];
+    const lastD=st.d[st.d.length-1];
+    const stEl=document.getElementById('stoch'+side+'-v');
+    if(stEl){stEl.textContent=lastK.toFixed(0)+'/'+lastD.toFixed(0);stEl.style.color=lastK>80?'#c0392b':lastK<20?'#0a7a6a':'#5c7a29';}
+  }catch(e){console.warn('stoch error:',e);}
+}
+
+// Stochastic 계산
+function stochCalc(candles,kPeriod=14,smooth=3){
+  if(!candles||candles.length<kPeriod+smooth*2)return null;
+  const rawK=[];
+  for(let i=kPeriod-1;i<candles.length;i++){
+    const sl=candles.slice(i-kPeriod+1,i+1);
+    const hi=Math.max(...sl.map(c=>c.high));
+    const lo=Math.min(...sl.map(c=>c.low));
+    rawK.push(hi===lo?50:100*(candles[i].close-lo)/(hi-lo));
+  }
+  const k=[];
+  for(let i=smooth-1;i<rawK.length;i++){
+    let s=0;for(let j=0;j<smooth;j++)s+=rawK[i-j];
+    k.push(s/smooth);
+  }
+  const d=[];
+  for(let i=smooth-1;i<k.length;i++){
+    let s=0;for(let j=0;j<smooth;j++)s+=k[i-j];
+    d.push(s/smooth);
+  }
+  return{k,d};
 }
 
 // RSI 계산 (standalone)
@@ -1585,7 +1676,7 @@ function drawDailyFib(chartId,dailyFib){
     const line=ser.createPriceLine({
       price:p,color,lineWidth:w,
       lineStyle:LightweightCharts.LineStyle.SparseDotted,
-      axisLabelVisible:false,
+      axisLabelVisible:true,
       title:label,
     });
     S.dailyFibLines[chartId].push(line);
@@ -1605,17 +1696,16 @@ function drawPivotLines(chartId,pivots){
     color:'rgba(15,214,111,0.95)',
     lineWidth:2,
     lineStyle:LightweightCharts.LineStyle.Solid,
-    axisLabelVisible:false,
-    title:'🟢 LONG PIVOT',
+    axisLabelVisible:true,
+    title:'🟢 LONG',
   });
-  // 숏 피봇 (고점 - 이 아래로 = 숏 전환)
   const sp=ser.createPriceLine({
     price:pivots.shortPivot,
     color:'rgba(255,75,110,0.95)',
     lineWidth:2,
     lineStyle:LightweightCharts.LineStyle.Solid,
-    axisLabelVisible:false,
-    title:'🔴 SHORT PIVOT',
+    axisLabelVisible:true,
+    title:'🔴 SHORT',
   });
   S.pivotLines[chartId].push(lp,sp);
 }
@@ -1665,7 +1755,7 @@ function drawYesterdayFib(chartId,yFib){
     const line=ser.createPriceLine({
       price:p,color,lineWidth:w,
       lineStyle:LightweightCharts.LineStyle.LargeDashed,
-      axisLabelVisible:false,
+      axisLabelVisible:true,
       title:label,
     });
     S.yFibLines[chartId].push(line);
@@ -1686,15 +1776,15 @@ function drawEntryLines(chartId,plan){
     color,
     lineWidth:2,
     lineStyle:LightweightCharts.LineStyle.Solid,
-    axisLabelVisible:false,
-    title:isLong?'🎯 LONG ENTRY':'🎯 SHORT ENTRY',
+    axisLabelVisible:true,
+    title:isLong?'🎯 LONG':'🎯 SHORT',
   });
   const tp1Line=ser.createPriceLine({
     price:plan.tp1,
     color:'rgba(15,214,111,0.85)',
     lineWidth:1.5,
     lineStyle:LightweightCharts.LineStyle.Dashed,
-    axisLabelVisible:false,
+    axisLabelVisible:true,
     title:'TP1',
   });
   const tp2Line=ser.createPriceLine({
@@ -1702,7 +1792,7 @@ function drawEntryLines(chartId,plan){
     color:'rgba(15,214,111,0.95)',
     lineWidth:2,
     lineStyle:LightweightCharts.LineStyle.Dashed,
-    axisLabelVisible:false,
+    axisLabelVisible:true,
     title:'TP2',
   });
   const slLine=ser.createPriceLine({
@@ -1710,7 +1800,7 @@ function drawEntryLines(chartId,plan){
     color:'rgba(255,75,110,0.95)',
     lineWidth:2,
     lineStyle:LightweightCharts.LineStyle.Dashed,
-    axisLabelVisible:false,
+    axisLabelVisible:true,
     title:'SL',
   });
   S.entryLines[chartId].push(entryLine,tp1Line,tp2Line,slLine);
