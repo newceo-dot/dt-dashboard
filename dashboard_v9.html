@@ -635,8 +635,8 @@ const COPT={
   layout:{background:{type:'Solid',color:'#ffffff'},textColor:'#666680'},
   grid:{vertLines:{color:'#f0f0f0'},horzLines:{color:'#f0f0f0'}},
   crosshair:{mode:1},
-  timeScale:{borderColor:'#e0e0e0',timeVisible:true,secondsVisible:false},
-  rightPriceScale:{borderColor:'#e0e0e0',width:58},
+  timeScale:{borderColor:'#e0e0e0',timeVisible:true,secondsVisible:false,rightOffset:3},
+  rightPriceScale:{borderColor:'#e0e0e0',width:52,scaleMargins:{top:0.05,bottom:0.05}},
 };
 const IND_OPT={
   layout:{background:{type:'Solid',color:'#ffffff'},textColor:'#666680'},
@@ -768,6 +768,19 @@ async function loadAll(){
           color:c.close>=c.open?'rgba(10,122,106,0.2)':'rgba(192,57,43,0.2)'
         })));
       }
+      // 최신 캔들이 우측에 보이게 스크롤 + 우측 여백 축소
+      if(S.charts[id]){
+        S.charts[id].timeScale().scrollToRealTime();
+        S.charts[id].applyOptions({
+          rightPriceScale:{
+            scaleMargins:{top:0.1,bottom:0.1},
+            minimumWidth:55, // 우측 가격축 최소 너비로 줄임
+          },
+          timeScale:{
+            rightOffset:5, // 최신 캔들 기준 우측 여백 최소화
+          },
+        });
+      }
     }
   });
 }
@@ -780,7 +793,10 @@ async function changeTF(tf,chartId,btn){
   S.curTF[chartId]=tf;
   const data=await fetchCandles(S.coin.usdt,tf,300);
   S.candles[key]=data;
-  if(S.series[chartId]&&data.length)S.series[chartId].setData(data);
+  if(S.series[chartId]&&data.length){
+    S.series[chartId].setData(data);
+    S.charts[chartId]?.timeScale().scrollToRealTime();
+  }
   recompute();
 }
 
@@ -1217,30 +1233,30 @@ function drawEMALines(chartId,data,ema60_1d,ema200_1d){
   const ser=S.series[chartId];
 
   // EMA5 — 검정, 약간 굵게
-  const e5=chart.addLineSeries({color:'rgba(20,20,20,0.85)',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'5'});
+  const e5=chart.addLineSeries({color:'rgba(20,20,20,0.85)',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
   e5.setData(emaSeries(data,5));
   S.emaLines[chartId].push(e5);
 
   // EMA10 — 파랑, 약간 굵게
-  const e10=chart.addLineSeries({color:'rgba(30,100,220,0.9)',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'10'});
+  const e10=chart.addLineSeries({color:'rgba(30,100,220,0.9)',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
   e10.setData(emaSeries(data,10));
   S.emaLines[chartId].push(e10);
 
   // EMA20 — 레드, 조금 굵게
-  const e20=chart.addLineSeries({color:'rgba(220,40,40,0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'20'});
+  const e20=chart.addLineSeries({color:'rgba(220,40,40,0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
   e20.setData(emaSeries(data,20));
   S.emaLines[chartId].push(e20);
 
   // EMA60 — 초록파랑, 굵게
   if(data.length>=60){
-    const e60=chart.addLineSeries({color:'rgba(10,160,80,1.0)',lineWidth:2.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'60'});
+    const e60=chart.addLineSeries({color:'rgba(10,160,80,1.0)',lineWidth:2.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
     e60.setData(emaSeries(data,60));
     S.emaLines[chartId].push(e60);
   }
 
   // EMA200 — 진분홍, 굵게
   if(data.length>=200){
-    const e200=chart.addLineSeries({color:'rgba(200,0,120,1.0)',lineWidth:2.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'200'});
+    const e200=chart.addLineSeries({color:'rgba(200,0,120,1.0)',lineWidth:2.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
     e200.setData(emaSeries(data,200));
     S.emaLines[chartId].push(e200);
   }
@@ -1267,7 +1283,7 @@ function drawVWAPLines(chartId,vwapData){
     S.vwapLines[chartId]=[];
 
     // VWAP 메인선 - 진한 파란색, 굵게
-    const mainLine=chart.addLineSeries({color:'rgba(15,90,200,1.0)',lineWidth:3,priceLineVisible:false,lastValueVisible:true,crosshairMarkerVisible:false,title:'VWAP'});
+    const mainLine=chart.addLineSeries({color:'rgba(15,90,200,1.0)',lineWidth:3,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:''});
     const u1=chart.addLineSeries({color:'rgba(26,95,180,0.65)',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
     const l1=chart.addLineSeries({color:'rgba(26,95,180,0.65)',lineWidth:1.5,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dashed});
     const u2=chart.addLineSeries({color:'rgba(192,57,43,0.55)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false,title:'',lineStyle:LightweightCharts.LineStyle.Dotted});
