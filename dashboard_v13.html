@@ -107,7 +107,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
 .chart-tab.active{color:#1971c2;border-bottom-color:#1971c2;background:#fff;}
 .chart-tab:hover{color:#1971c2;}
 
-/* 좌측 드로잉 툴바 */
+/* 차트 탭 버튼 */
+.ctab-btn{background:transparent;border:none;border-bottom:3px solid transparent;padding:6px 16px;font-size:11px;font-weight:700;color:#888;cursor:pointer;font-family:inherit;transition:all 0.15s;margin-bottom:-2px;}
+.ctab-btn.active{color:#1971c2;border-bottom-color:#1971c2;background:#fff;}
+.ctab-btn:hover{color:#1971c2;}
 #left-toolbar{width:36px;background:var(--bg2);border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;padding:4px 0;gap:2px;flex-shrink:0;overflow:hidden;}
 .ltool{width:28px;height:28px;background:transparent;border:none;color:var(--tx2);cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all 0.1s;}
 .ltool:hover{background:var(--bg3);color:var(--tx);}
@@ -286,6 +289,50 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
   .logo{font-size:12px;}
   .mb-tab{padding:5px 10px;font-size:10px;}
 }
+
+/* === 접었을 때 세로 스택 (≤500px) === */
+@media (max-width:500px){
+  /* 듀얼 차트 세로 스택 */
+  #view-dual{
+    flex-direction:column !important;
+    overflow-y:auto !important;
+    height:auto !important;
+  }
+  #view-dual > div{
+    flex:none !important;
+    height:auto !important;
+    min-height:0 !important;
+  }
+  /* 각 차트 높이 */
+  #cL, #cR{
+    height:45vw !important;
+    min-height:200px !important;
+  }
+  /* 보조지표 높이 유지 */
+  #cL-rsi-wrap, #cR-rsi-wrap,
+  #cL-stoch-wrap, #cR-stoch-wrap{
+    height:55px !important;
+    display:flex !important;
+  }
+  /* 탭바 모바일 표시 */
+  #chart-tabs-bar{
+    display:flex !important;
+    position:sticky;
+    top:48px;
+    z-index:90;
+    background:#f0f4f8;
+  }
+  /* 멀티차트 뷰도 세로 */
+  #view-multi{
+    flex-direction:column !important;
+    overflow-y:auto !important;
+    height:auto !important;
+  }
+  #ca{
+    grid-template-columns:1fr !important;
+    height:auto !important;
+  }
+}
 </style>
 </head>
 <body>
@@ -325,11 +372,6 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
     <div class="si"><div class="sd" id="d-trend"></div><span>추세</span></div>
     <div class="si"><div class="sd" id="d-fib"></div><span>피보</span></div>
     <div class="si"><div class="sd" id="d-osc"></div><span>오실</span></div>
-    <!-- 차트 뷰 탭 버튼 헤더에 통합 -->
-    <div style="display:flex;gap:0;background:var(--bg3);border:1px solid var(--bd);border-radius:3px;overflow:hidden;flex-shrink:0;">
-      <button onclick="switchChartView('dual')" id="tab-dual" style="background:#1971c2;color:#fff;border:none;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;">듀얼</button>
-      <button onclick="switchChartView('multi')" id="tab-multi" style="background:transparent;color:var(--tx2);border:none;padding:3px 9px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;">멀티</button>
-    </div>
     <button id="hline-btn" onclick="toggleHLineMode()" style="display:none;"></button>
     <div id="wst" class="off">● OFF</div>
   </div>
@@ -387,6 +429,12 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
   <button class="ltool" onclick="undoLastDrawing()" title="실행 취소 (Ctrl+Z)">
     <svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 8a5 5 0 1 1 .5 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M3 4v4h4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
+</div>
+
+<!-- 차트 탭 바 (차트 영역 바로 위) -->
+<div id="chart-tabs-bar" style="display:flex;align-items:center;gap:0;background:#f0f4f8;border-bottom:2px solid #d0d8e4;flex-shrink:0;padding:0 4px;">
+  <button class="ctab-btn active" id="tab-dual" onclick="switchChartView('dual')">듀얼 차트</button>
+  <button class="ctab-btn" id="tab-multi" onclick="switchChartView('multi')">멀티 차트</button>
 </div>
 
 <!-- 새 듀얼 차트 뷰 -->
@@ -890,8 +938,8 @@ function switchChartView(view){
   }
   const dualBtn=document.getElementById('tab-dual');
   const multiBtn=document.getElementById('tab-multi');
-  if(dualBtn){dualBtn.style.background=view==='dual'?'#1971c2':'transparent';dualBtn.style.color=view==='dual'?'#fff':'var(--tx2)';}
-  if(multiBtn){multiBtn.style.background=view==='multi'?'#1971c2':'transparent';multiBtn.style.color=view==='multi'?'#fff':'var(--tx2)';}
+  if(dualBtn){dualBtn.classList.toggle('active',view==='dual');}
+  if(multiBtn){multiBtn.classList.toggle('active',view==='multi');}
   // 200ms 대기 후 강제 리사이즈
   setTimeout(()=>{
     Object.keys(S.charts).forEach(k=>{
@@ -1205,62 +1253,65 @@ function initDrawingCanvas(canvasId,chartId){
   const chartEl=document.getElementById(chartId);
   if(!canvas||!chartEl)return;
 
+  // 부모 position 확보
+  const parent=canvas.parentElement;
+  if(parent&&getComputedStyle(parent).position==='static')parent.style.position='relative';
+
+  // 캔버스 설정 - 항상 pointer-events:all
+  canvas.style.pointerEvents='all';
+  canvas.style.position='absolute';
+  canvas.style.inset='0';
+  canvas.style.zIndex='10';
+
   function resizeCanvas(){
-    canvas.width=chartEl.offsetWidth;
-    canvas.height=chartEl.offsetHeight;
+    const w=chartEl.offsetWidth,h=chartEl.offsetHeight;
+    if(w>0&&h>0){canvas.width=w;canvas.height=h;}
     renderDrawingsOnCanvas(canvasId,chartId);
   }
   new ResizeObserver(resizeCanvas).observe(chartEl);
   resizeCanvas();
 
-  // 마우스 이벤트
   canvas.addEventListener('mousedown',e=>{
-    const pt=getChartPt(e,canvas,chartId);
     if(DS.tool==='none'){
-      // 선택 모드: 클릭으로 선택, 드래그로 이동
+      const pt=getChartPt(e,canvas,chartId);
       const hit=DS.drawings.find(d=>hitTest(d,pt.x,pt.y,chartId));
       DS.selected=hit?hit.id:null;
       if(hit){
-        const c1=ptToCoord(hit.p1,chartId),c2=ptToCoord(hit.p2,chartId);
         DS.dragging={id:hit.id,chartId};
         DS.dragStart={x:pt.x,y:pt.y,p1:{...hit.p1},p2:{...hit.p2}};
         canvas.style.cursor='move';
+        e.stopPropagation();
       }
-      reRenderAll();
-      return;
+      reRenderAll();return;
     }
+    e.stopPropagation();
+    const pt=getChartPt(e,canvas,chartId);
     DS.isDrawing=true;DS.startPt=pt;
   });
 
   canvas.addEventListener('mousemove',e=>{
     const pt=getChartPt(e,canvas,chartId);
     if(DS.dragging&&DS.dragStart&&e.buttons===1){
-      // 이동
       const dx=pt.x-DS.dragStart.x,dy=pt.y-DS.dragStart.y;
       const draw=DS.drawings.find(d=>d.id===DS.dragging.id);
       if(draw){
-        const ser=S.series[chartId];
-        const chart=S.charts[chartId];
+        const ser=S.series[chartId],chart=S.charts[chartId];
         if(ser&&chart){
-          const base=DS.dragStart;
-          // p1 이동
-          const nc1x=(base.p1.logX!=null?chart.timeScale().logicalToCoordinate(base.p1.logX):base.p1.x)+dx;
-          const nc1y=(base.p1.price!=null?ser.priceToCoordinate(base.p1.price):base.p1.y)+dy;
+          const b=DS.dragStart;
+          const nc1x=(b.p1.logX!=null?chart.timeScale().logicalToCoordinate(b.p1.logX):b.p1.x)+dx;
+          const nc1y=(b.p1.price!=null?ser.priceToCoordinate(b.p1.price):b.p1.y)+dy;
           draw.p1.price=ser.coordinateToPrice(nc1y);
           draw.p1.logX=chart.timeScale().coordinateToLogical(nc1x);
-          // p2 이동
-          const nc2x=(base.p2.logX!=null?chart.timeScale().logicalToCoordinate(base.p2.logX):base.p2.x)+dx;
-          const nc2y=(base.p2.price!=null?ser.priceToCoordinate(base.p2.price):base.p2.y)+dy;
+          const nc2x=(b.p2.logX!=null?chart.timeScale().logicalToCoordinate(b.p2.logX):b.p2.x)+dx;
+          const nc2y=(b.p2.price!=null?ser.priceToCoordinate(b.p2.price):b.p2.y)+dy;
           draw.p2.price=ser.coordinateToPrice(nc2y);
           draw.p2.logX=chart.timeScale().coordinateToLogical(nc2x);
           DS.dragStart={x:pt.x,y:pt.y,p1:{...draw.p1},p2:{...draw.p2}};
         }
       }
-      reRenderAll();
-      return;
+      reRenderAll();return;
     }
     if(DS.tool==='none'){
-      // 호버 커서
       const hit=DS.drawings.find(d=>hitTest(d,pt.x,pt.y,chartId));
       canvas.style.cursor=hit?'move':'default';
       return;
@@ -1273,23 +1324,18 @@ function initDrawingCanvas(canvasId,chartId){
   canvas.addEventListener('mouseup',e=>{
     if(DS.dragging){
       DS.dragging=null;DS.dragStart=null;
-      canvas.style.cursor='move';
       saveDrawings();return;
     }
     if(!DS.isDrawing||DS.tool==='none')return;
     DS.isDrawing=false;
     const pt=getChartPt(e,canvas,chartId);
     const s=DS.startPt;if(!s)return;
-    const dist=Math.hypot(pt.x-s.x,pt.y-s.y);
-    if(dist<3&&DS.tool!=='hline')return;
-    const draw={id:mkId(),tool:DS.tool,chartId,p1:{...s},p2:{...pt}};
-    DS.drawings.push(draw);
-    saveDrawings();
-    reRenderAll();
+    if(Math.hypot(pt.x-s.x,pt.y-s.y)<3&&DS.tool!=='hline')return;
+    DS.drawings.push({id:mkId(),tool:DS.tool,chartId,p1:{...s},p2:{...pt}});
+    saveDrawings();reRenderAll();
   });
 
   canvas.addEventListener('dblclick',e=>{
-    // 더블클릭으로 삭제
     if(DS.tool!=='none')return;
     const pt=getChartPt(e,canvas,chartId);
     const idx=DS.drawings.findIndex(d=>hitTest(d,pt.x,pt.y,chartId));
@@ -1303,7 +1349,6 @@ function initDrawingCanvas(canvasId,chartId){
     if(idx!==-1){DS.drawings.splice(idx,1);DS.selected=null;saveDrawings();reRenderAll();}
   });
 
-  // 차트 scroll/zoom 시 재렌더
   const chart=S.charts[chartId];
   if(chart){
     chart.timeScale().subscribeVisibleTimeRangeChange(()=>renderDrawingsOnCanvas(canvasId,chartId));
