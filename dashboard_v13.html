@@ -1176,15 +1176,15 @@ const DS={
 
 function setDrawTool(tool,btn){
   DS.tool=tool;DS.selected=null;DS.dragging=null;DS.isDrawing=false;
-  // 버튼 active 상태
   document.querySelectorAll('.dtool,.ltool').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
-  // 도구 레이블
-  const labels={none:'선택',hline:'수평선',trend:'추세선',channel:'평행채널',rect:'박스',fib:'피보나치'};
   const lbl=document.getElementById('draw-tool-label');
-  if(lbl)lbl.textContent=tool==='none'?'':labels[tool]||tool;
-  // 캔버스 커서 설정
-  document.querySelectorAll('.draw-canvas').forEach(cv=>{
+  const labels={none:'',hline:'수평선',trend:'추세선',channel:'평행채널',rect:'박스',fib:'피보나치'};
+  if(lbl)lbl.textContent=labels[tool]||'';
+  // 선택 모드 → pointer-events:none (차트 스크롤 허용)
+  // 그리기 모드 → pointer-events:all (캔버스가 이벤트 받음)
+  document.querySelectorAll('[id^="canvas-"]').forEach(cv=>{
+    cv.style.pointerEvents=tool==='none'?'none':'all';
     cv.style.cursor=tool==='none'?'default':'crosshair';
   });
   reRenderAll();
@@ -1250,10 +1250,11 @@ function initDrawingCanvas(canvasId,chartId){
   const wrapper=canvas.parentElement;
   if(!wrapper)return;
 
-  // wrapper에 position:relative 보장
-  if(getComputedStyle(wrapper).position==='static'){
-    wrapper.style.position='relative';
-  }
+  // 초기 상태: 선택 모드 = pointer-events:none (차트 스크롤 허용)
+  canvas.style.pointerEvents='none';
+  canvas.style.position='absolute';
+  canvas.style.inset='0';
+  canvas.style.zIndex='10';
 
   // 캔버스 크기를 wrapper 기준으로
   function resizeCanvas(){
@@ -1270,8 +1271,8 @@ function initDrawingCanvas(canvasId,chartId){
 
   // ── 마우스 이벤트 ──
   canvas.addEventListener('mousedown',e=>{
-    const pt=getChartPt(e,canvas,chartId);
     if(DS.tool==='none'){
+      const pt=getChartPt(e,canvas,chartId);
       const hit=DS.drawings.find(d=>hitTest(d,pt.x,pt.y,chartId));
       DS.selected=hit?hit.id:null;
       if(hit){
@@ -1288,6 +1289,20 @@ function initDrawingCanvas(canvasId,chartId){
     DS.isDrawing=true;
     DS.startPt=pt2;
   });
+
+  // 선택 모드에서 드로잉 근처일 때만 pointer-events 활성화
+  const parentWrapper=canvas.parentElement;
+  if(parentWrapper){
+    parentWrapper.addEventListener('mousemove',e=>{
+      if(DS.tool!=='none')return;
+      const rect=canvas.getBoundingClientRect();
+      const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+      const hit=DS.drawings.find(d=>hitTest(d,mx,my,chartId));
+      // 드로잉 위에 있으면 canvas pointer-events 켜기, 아니면 끄기
+      canvas.style.pointerEvents=hit||DS.dragging?'all':'none';
+      if(hit)canvas.style.cursor='move';
+    });
+  }
 
   canvas.addEventListener('mousemove',e=>{
     const pt=getChartPt(e,canvas,chartId);
@@ -1329,7 +1344,9 @@ function initDrawingCanvas(canvasId,chartId){
   canvas.addEventListener('mouseup',e=>{
     if(DS.dragging){
       DS.dragging=null;DS.dragStart=null;
-      canvas.style.cursor=DS.tool==='none'?'default':'crosshair';
+      // 드래그 끝나면 선택모드에서 다시 pointer-events 끄기
+      if(DS.tool==='none')canvas.style.pointerEvents='none';
+      canvas.style.cursor='default';
       saveDrawings();return;
     }
     if(!DS.isDrawing||DS.tool==='none')return;
