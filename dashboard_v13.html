@@ -108,8 +108,22 @@ body{background:var(--bg);color:var(--tx);font-family:'Malgun Gothic','맑은 �
 .chart-tab:hover{color:#1971c2;}
 
 /* 차트 탭 버튼 */
-.ctab-btn{background:transparent;border:none;border-bottom:3px solid transparent;padding:6px 16px;font-size:11px;font-weight:700;color:#888;cursor:pointer;font-family:inherit;transition:all 0.15s;margin-bottom:-2px;}
-.ctab-btn.active{color:#1971c2;border-bottom-color:#1971c2;background:#fff;}
+/* 차트 탭 바 — 헤더 바로 아래 sticky */
+#chart-tabs-bar{
+  position:sticky;
+  top:48px;
+  z-index:95;
+  display:flex !important;
+  align-items:center;
+  gap:0;
+  background:#fff;
+  border-bottom:2px solid #d0d8e4;
+  flex-shrink:0;
+  padding:0 8px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.06);
+}
+.ctab-btn{background:transparent;border:none;border-bottom:3px solid transparent;padding:7px 18px;font-size:12px;font-weight:700;color:#888;cursor:pointer;font-family:inherit;transition:all 0.15s;margin-bottom:-2px;}
+.ctab-btn.active{color:#1971c2;border-bottom-color:#1971c2;}
 .ctab-btn:hover{color:#1971c2;}
 #left-toolbar{width:36px;background:var(--bg2);border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;padding:4px 0;gap:2px;flex-shrink:0;overflow:hidden;}
 .ltool{width:28px;height:28px;background:transparent;border:none;color:var(--tx2);cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all 0.1s;}
@@ -2226,7 +2240,7 @@ function drawFibLines(chartId,fib,dayHigh,dayLow){
     const p=fib.levels[lv];if(!p)return;
     const line=ser.createPriceLine({
       price:p,color,lineWidth:w,
-      lineStyle:LightweightCharts.LineStyle.Dotted,
+      lineStyle:LightweightCharts.LineStyle.Solid,
       axisLabelVisible:!!show,
       title:show?label:'',
     });
@@ -2235,8 +2249,8 @@ function drawFibLines(chartId,fib,dayHigh,dayLow){
 
   // 당일 고저
   if((chartId==='c3m'||chartId==='c15m')&&dayHigh&&dayLow){
-    const dh=ser.createPriceLine({price:dayHigh,color:'rgba(192,57,43,0.6)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
-    const dl=ser.createPriceLine({price:dayLow,color:'rgba(10,122,106,0.6)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+    const dh=ser.createPriceLine({price:dayHigh,color:'rgba(192,57,43,0.6)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Solid,axisLabelVisible:false,title:''});
+    const dl=ser.createPriceLine({price:dayLow,color:'rgba(10,122,106,0.6)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Solid,axisLabelVisible:false,title:''});
     S.fibLines[chartId].push(dh,dl);
   }
 }
@@ -2264,7 +2278,7 @@ function drawDailyFib(chartId,dailyFib){
     const titleStr=`${label} $${fu2(p)}`;
     const line=ser.createPriceLine({
       price:p,color:key?'rgba(0,0,0,1.0)':color,lineWidth:key?2:w,
-      lineStyle:LightweightCharts.LineStyle.Dotted,
+      lineStyle:LightweightCharts.LineStyle.Solid,
       axisLabelVisible:true,
       title:titleStr,
     });
@@ -2345,7 +2359,7 @@ function drawYesterdayFib(chartId,yFib){
     const titleStr=`${label} $${fu2(p)}`;
     const line=ser.createPriceLine({
       price:p,color:key?'rgba(10,50,180,1.0)':color,lineWidth:key?2.5:w,
-      lineStyle:LightweightCharts.LineStyle.Dotted,
+      lineStyle:LightweightCharts.LineStyle.Solid,
       axisLabelVisible:true,
       title:titleStr,
     });
@@ -2489,7 +2503,7 @@ function drawVPLines(chartId,vp){
   const ser=S.series[chartId];if(!ser||!vp)return;
   if(S.vpLines[chartId])S.vpLines[chartId].forEach(l=>{try{ser.removePriceLine(l);}catch(e){}});
   S.vpLines[chartId]=[];
-  const add=(price,color,w=1)=>{const l=ser.createPriceLine({price,color,lineWidth:w,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});S.vpLines[chartId].push(l);};
+  const add=(price,color,w=1)=>{const l=ser.createPriceLine({price,color,lineWidth:w,lineStyle:LightweightCharts.LineStyle.Solid,axisLabelVisible:false,title:''});S.vpLines[chartId].push(l);};
   add(vp.poc.price,'rgba(200,134,10,0.7)',1.5);
   add(vp.vah,'rgba(10,122,106,0.5)');
   add(vp.val,'rgba(10,122,106,0.5)');
@@ -2802,56 +2816,56 @@ async function recompute(){
     const isNormalArr=e20&&e50&&e100&&e20>e50&&e50>e100; // 정배열
     const isReverseArr=e20&&e50&&e100&&e20<e50&&e50<e100; // 역배열
 
-    // ─ 롱 화살표 조건 ─
-    // 1) 역배열→정배열 전환 직전 (역배열이지만 e20이 e50 근접)
-    const nearTurnLong=e20&&e50&&isReverseArr&&Math.abs(e20-e50)/e50<0.005;
-    // 2) VWMA100 상향 돌파
-    const vwmaBreakLong=vwma100&&price>vwma100&&closes[closes.length-2]<vwma100;
-    // 3) EMA50+100 수렴 지지 (가격이 둘 사이 혹은 바로 위)
-    const emaConvLong=e50&&e100&&price>e50*0.997&&price<e50*1.015&&Math.abs(e50-e100)/e50<0.003;
-    // 4) 대형봉 EMA200 터치
-    const ema200TouchLong=e200&&Math.abs(price-e200)/e200<0.005&&price>e200;
-    // 5) 볼린저 하단 과매도 아님 (추격 금지)
-    const notOverbought=rsiVal<65;
+    // ─ 롱 화살표 조건 (RED ▲) ─
+    // 1) 역배열→정배열 직전: e20이 e50 돌파 직전 (0.3% 이내)
+    const nearTurnLong=isReverseArr&&e20&&e50&&(e50-e20)/e50<0.003;
+    // 2) VWMA100 상향 돌파 (직전봉 아래 → 현재봉 위)
+    const vwmaBreakLong=vwma100&&price>vwma100&&closes[closes.length-2]<=vwma100;
+    // 3) EMA50+EMA100 수렴 (0.2% 이내) + 가격이 위에서 지지
+    const emaConvLong=e50&&e100&&Math.abs(e50-e100)/e50<0.002&&price>Math.max(e50,e100);
+    // 4) EMA200 터치 후 반등 (0.3% 이내 + 직전봉 EMA200 아래였다가 현재 위)
+    const ema200TouchLong=e200&&price>e200&&closes[closes.length-2]<e200*1.003&&Math.abs(price-e200)/e200<0.005;
+    // RSI 과매수 아님
+    const notOverbought=rsiVal<70;
 
     const longScore=[nearTurnLong,vwmaBreakLong,emaConvLong,ema200TouchLong].filter(Boolean).length;
-    if(longScore>=2&&notOverbought&&price>closes[closes.length-2]){
+    if(longScore>=2&&notOverbought){
       const last=data[data.length-1];
-      const sl=e100||e50||price*0.99;
-      const tp=vwma100||(price*(1+0.07));
-      const rr=(tp-price)/(price-sl);
-      if(rr>=1.5){ // 손익비 1.5 이상만
+      const sl=Math.min(e100||price,e50||price,e200||price)*0.998;
+      const tp=vwma100&&vwma100>price?vwma100:price*1.05;
+      const rr=sl<price?(tp-price)/(price-sl):0;
+      if(rr>=1.5){
         markers.push({
           time:last.time,
           position:'belowBar',
-          color:'#0a7a6a',
+          color:'#e53935',  // 상승 = 레드
           shape:'arrowUp',
-          text:`▲L ${longScore}`,
+          text:'',          // 텍스트 없음
           size:longScore>=3?3:2,
         });
       }
     }
 
-    // ─ 숏 화살표 조건 ─
-    const nearTurnShort=e20&&e50&&isNormalArr&&Math.abs(e20-e50)/e50<0.005;
-    const vwmaBreakShort=vwma100&&price<vwma100&&closes[closes.length-2]>vwma100;
-    const emaConvShort=e50&&e100&&price<e50*1.003&&price>e50*0.985&&Math.abs(e50-e100)/e50<0.003;
-    const ema200TouchShort=e200&&Math.abs(price-e200)/e200<0.005&&price<e200;
-    const notOversold=rsiVal>35;
+    // ─ 숏 화살표 조건 (BLUE ▼) ─
+    const nearTurnShort=isNormalArr&&e20&&e50&&(e20-e50)/e50<0.003;
+    const vwmaBreakShort=vwma100&&price<vwma100&&closes[closes.length-2]>=vwma100;
+    const emaConvShort=e50&&e100&&Math.abs(e50-e100)/e50<0.002&&price<Math.min(e50,e100);
+    const ema200TouchShort=e200&&price<e200&&closes[closes.length-2]>e200*0.997&&Math.abs(price-e200)/e200<0.005;
+    const notOversold=rsiVal>30;
 
     const shortScore=[nearTurnShort,vwmaBreakShort,emaConvShort,ema200TouchShort].filter(Boolean).length;
-    if(shortScore>=2&&notOversold&&price<closes[closes.length-2]){
+    if(shortScore>=2&&notOversold){
       const last=data[data.length-1];
-      const sl=e100||e50||price*1.01;
-      const tp=vwma100||(price*(1-0.07));
-      const rr=(price-tp)/(sl-price);
+      const sl=Math.max(e100||price,e50||price,e200||price)*1.002;
+      const tp=vwma100&&vwma100<price?vwma100:price*0.95;
+      const rr=sl>price?(price-tp)/(sl-price):0;
       if(rr>=1.5){
         markers.push({
           time:last.time,
           position:'aboveBar',
-          color:'#c0392b',
+          color:'#1565c0',  // 하락 = 블루
           shape:'arrowDown',
-          text:`▼S ${shortScore}`,
+          text:'',          // 텍스트 없음
           size:shortScore>=3?3:2,
         });
       }
